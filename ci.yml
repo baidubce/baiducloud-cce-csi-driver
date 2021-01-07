@@ -1,0 +1,12 @@
+Global:
+    tool : build_submitter
+
+Default:
+    profile : [build]
+
+Profiles:
+    - profile:
+      name : build
+      env : DECK_CENTOS6U3_K3
+      command : make -f Makefile
+      release : True
