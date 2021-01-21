@@ -1,0 +1,84 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: csi-bosplugin-node-server
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: csi-bosplugin-node-server
+  template:
+    metadata:
+      labels:
+        app: csi-bosplugin-node-server
+    spec:
+      serviceAccount: csi-bos-external-runner
+      hostNetwork: true
+      restartPolicy: Always
+      priorityClassName: system-node-critical
+      containers:
+        - name: node-driver-registrar
+          image: registry.baidubce.com/cce-plugin-pro/csi-node-driver-registrar:v2.1.0
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--kubelet-registration-path=$(ADDRESS)"
+            - "--v=5"
+          env:
+            - name: ADDRESS
+              value: /home/cce/kubelet/plugins/bos.csi.baidubce.com/csi.sock
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: reg-dir
+              mountPath: /registration
+            - name: kubelet-dir
+              mountPath: /home/cce/kubelet
+        - name: csi-bosplugin
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          image: registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:v1.0.0
+          args :
+            - "--driver-type=bos"
+            - "--csi-endpoint=$(CSI_ENDPOINT)"
+            - "--driver-mode=node"
+            - "--max-volumes-per-node=10"
+            - "--region=gz"
+            - "--logtostderr"
+            - "--v=5"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix://home/cce/kubelet/plugins/bos.csi.baidubce.com/csi.sock
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: kubelet-dir
+              mountPath: /home/cce/kubelet
+              mountPropagation: "Bidirectional"
+            - name: host-sys
+              mountPath: /sys
+              mountPropagation: "HostToContainer"
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+            - name: bosfs-cred-dir
+              mountPath: /etc/bosfs/credentials
+      volumes:
+        - name: kubelet-dir
+          hostPath:
+            path: /home/cce/kubelet
+            type: DirectoryOrCreate
+        - name: reg-dir
+          hostPath:
+            path: /home/cce/kubelet/plugins_registry
+            type: DirectoryOrCreate
+        - name: host-sys
+          hostPath:
+            path: /sys
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+            type: File
+        - name: bosfs-cred-dir
+          hostPath:
+            path: /etc/bosfs/credentials
+            type: DirectoryOrCreate

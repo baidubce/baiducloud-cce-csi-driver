@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app-cds-block-volume
+  namespace: default
+spec:
+  containers:
+    - image: hub.baidubce.com/jpaas-public/nginx:latest
+      imagePullPolicy: Always
+      name: nginx
+      volumeDevices:
+        - name: block
+          devicePath: /dev/block
+  volumes:
+    - name: block
+      persistentVolumeClaim:
+        claimName: pvc-cds-block-volume

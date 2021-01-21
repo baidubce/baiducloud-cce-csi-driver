@@ -1,0 +1,91 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: csi-cdsplugin-controller-server
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: csi-cdsplugin-controller-server
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: csi-cdsplugin-controller-server
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - csi-cdsplugin-controller-server
+                topologyKey: "kubernetes.io/hostname"
+      priorityClassName: system-node-critical
+      serviceAccount: csi-cds-external-runner
+      hostNetwork: true
+      containers:
+        - name: csi-provisioner
+          image: registry.baidubce.com/cce-plugin-pro/csi-provisioner:v1.6.1
+          args:
+            - "--provisioner=cds.csi.baidubce.com"
+            - "--csi-address=$(ADDRESS)"
+            - "--feature-gates=Topology=True"
+            - "--volume-name-prefix=pv"
+            - "--strict-topology=true"
+            - "--timeout=60s"
+            - "--enable-leader-election=true"
+            - "--leader-election-type=leases"
+            - "--v=5"
+          env:
+            - name: ADDRESS
+              value: /home/cce/kubelet/plugins/cds.csi.baidubce.com/csi.sock
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /home/cce/kubelet/plugins/cds.csi.baidubce.com
+        - name: csi-attacher
+          image: registry.baidubce.com/cce-plugin-pro/csi-attacher:v2.2.1
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+            - "--v=5"
+          env:
+            - name: ADDRESS
+              value: /home/cce/kubelet/plugins/cds.csi.baidubce.com/csi.sock
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /home/cce/kubelet/plugins/cds.csi.baidubce.com
+        - name: csi-cdsplugin
+          image: registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:v1.0.0
+          imagePullPolicy: "Always"
+          args:
+            - "--driver-type=cds"
+            - "--csi-endpoint=$(CSI_ENDPOINT)"
+            - "--driver-mode=controller"
+            - "--cluster-id=cce-xxxxxx"
+            - "--region=gz"
+            - "--logtostderr"
+            - "--v=5"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix://home/cce/kubelet/plugins/cds.csi.baidubce.com/csi.sock
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /home/cce/kubelet/plugins/cds.csi.baidubce.com
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1000Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+      volumes:
+        - name: plugin-dir
+          emptyDir: {}

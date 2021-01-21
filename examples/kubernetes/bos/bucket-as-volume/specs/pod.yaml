@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+  namespace: default
+spec:
+  containers:
+    - image: hub.baidubce.com/jpaas-public/nginx:latest
+      imagePullPolicy: Always
+      name: nginx
+      volumeMounts:
+        - mountPath: /var/lib/www/html
+          name: bos-bucket
+        - mountPath: /var/lib/www/html000
+          name: bos-bucket
+          readOnly: true
+      livenessProbe:
+        exec:
+          command:
+            - ls
+            - /var/lib/www/html
+        initialDelaySeconds: 5
+        periodSeconds: 10
+  volumes:
+    - name: bos-bucket
+      persistentVolumeClaim:
+        claimName: pvc-bos-bucket
+        readOnly: false

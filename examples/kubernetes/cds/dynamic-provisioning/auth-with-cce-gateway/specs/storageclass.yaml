@@ -1,0 +1,11 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: cds-hp1
+provisioner: cds.csi.baidubce.com
+parameters:
+  paymentTiming: "Postpaid"         # Postpaid or Prepaid
+  storageType: "hp1"                # Support: cloud_hp1, hp1, HDD_Throughput, hdd, std1
+  reservationLength: "3"            # Necessary in Prepaid mode
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer

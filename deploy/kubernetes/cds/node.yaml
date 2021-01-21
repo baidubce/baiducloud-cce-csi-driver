@@ -1,0 +1,78 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: csi-cdsplugin-node-server
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: csi-cdsplugin-node-server
+  template:
+    metadata:
+      labels:
+        app: csi-cdsplugin-node-server
+    spec:
+      serviceAccount: csi-cds-external-runner
+      hostNetwork: true
+      restartPolicy: Always
+      priorityClassName: system-node-critical
+      containers:
+        - name: node-driver-registrar
+          image: registry.baidubce.com/cce-plugin-pro/csi-node-driver-registrar:v2.1.0
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--kubelet-registration-path=$(ADDRESS)"
+            - "--v=5"
+          env:
+            - name: ADDRESS
+              value: /home/cce/kubelet/plugins/cds.csi.baidubce.com/csi.sock
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: reg-dir
+              mountPath: /registration
+            - name: kubelet-dir
+              mountPath: /home/cce/kubelet
+        - name: csi-cdsplugin
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          image: registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:v1.0.0
+          args :
+            - "--driver-type=cds"
+            - "--csi-endpoint=$(CSI_ENDPOINT)"
+            - "--driver-mode=node"
+            - "--max-volumes-per-node=10"
+            - "--region=gz"
+            - "--logtostderr"
+            - "--v=5"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix://home/cce/kubelet/plugins/cds.csi.baidubce.com/csi.sock
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: kubelet-dir
+              mountPath: /home/cce/kubelet
+              mountPropagation: "Bidirectional"
+            - name: host-dev
+              mountPath: /dev
+              mountPropagation: "HostToContainer"
+            - name: host-sys
+              mountPath: /sys
+              mountPropagation: "HostToContainer"
+      volumes:
+        - name: kubelet-dir
+          hostPath:
+            path: /home/cce/kubelet
+            type: DirectoryOrCreate
+        - name: reg-dir
+          hostPath:
+            path: /home/cce/kubelet/plugins_registry
+            type: DirectoryOrCreate
+        - name: host-dev
+          hostPath:
+            path: /dev
+        - name: host-sys
+          hostPath:
+            path: /sys
