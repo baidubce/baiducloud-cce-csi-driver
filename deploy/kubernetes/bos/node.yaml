@@ -50,6 +50,10 @@ spec:
           env:
             - name: CSI_ENDPOINT
               value: unix://home/cce/kubelet/plugins/bos.csi.baidubce.com/csi.sock
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           imagePullPolicy: "Always"
           volumeMounts:
             - name: kubelet-dir

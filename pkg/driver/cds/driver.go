@@ -16,6 +16,7 @@
 package cds
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -54,12 +55,13 @@ func NewDriver(setOptions ...func(*common.DriverOptions)) (*Driver, error) {
 
 	if options.Mode == common.DriverModeNode || options.Mode == common.DriverModeAll {
 		if options.NodeOptions.NodeID == "" || options.NodeOptions.Zone == "" {
-			metaService, err := cloud.NewMetaDataService()
+			nodeID, zone, err := common.GetNodeTopology(context.Background(), options.TopologyMode)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get meta data, err: %v", err)
+				return nil, fmt.Errorf("failed to get nodeID or zone, err: %v", err)
 			}
-			options.NodeOptions.NodeID = metaService.InstanceID()
-			options.NodeOptions.Zone = metaService.Zone()
+
+			options.NodeOptions.NodeID = nodeID
+			options.NodeOptions.Zone = zone
 		}
 		node = newNodeServer(newMounter(), &options)
 	}

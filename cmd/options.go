@@ -57,6 +57,8 @@ var (
 	BOSEndpointVar string
 
 	BosfsImageVar string
+
+	topologyModeVar string
 )
 
 type Options struct {
@@ -66,6 +68,7 @@ type Options struct {
 	Region            string
 	ClusterID         string
 	AuthMode          cloud.AuthMode
+	TopologyMode      common.TopologyMode
 	NodeID            string
 	Zone              string
 	MaxVolumesPerNode int
@@ -87,6 +90,7 @@ func init() {
 	flag.StringVar(&CDSEndpointVar, "cds-endpoint", "", "Endpoint of CDS openapi service. (optional)")
 	flag.StringVar(&BOSEndpointVar, "bos-endpoint", "", "Endpoint of BOS openapi service. (optional)")
 	flag.StringVar(&BosfsImageVar, "bosfs-image", defaultBosfsImage, "bosfs image use by CSI bosplugin. (optional)")
+	flag.StringVar(&topologyModeVar, "topology-mode", "auto", "Node topology provider mode. (optional)")
 
 	flag.BoolVar(&ShowVersionVar, "version", false, "Show CSI driver version.")
 }
@@ -149,6 +153,7 @@ func parseBOSDriverFlags(options *Options) (*Options, error) {
 	}
 
 	options.BosfsImage = BosfsImageVar
+	options.TopologyMode = common.TopologyMode(topologyModeVar)
 
 	return options, nil
 }
@@ -193,6 +198,8 @@ func parseCDSDriverFlags(options *Options) (*Options, error) {
 		// https://cloud.baidu.com/doc/BCC/s/0jwvyo603
 		options.CDSEndpoint = "bcc." + options.Region + ".baidubce.com"
 	}
+
+	options.TopologyMode = common.TopologyMode(topologyModeVar)
 
 	return options, nil
 }

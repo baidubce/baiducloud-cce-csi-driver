@@ -34,6 +34,7 @@ type DriverOptions struct {
 	Mode          DriverMode
 	AuthMode      cloud.AuthMode
 	Region        string
+	TopologyMode  TopologyMode
 }
 
 type ControllerOptions struct {
@@ -125,5 +126,11 @@ func WithBOSEndpoint(endpoint string) func(options *DriverOptions) {
 func WithBosfsImage(image string) func(options *DriverOptions) {
 	return func(options *DriverOptions) {
 		options.BosfsImage = image
+	}
+}
+
+func WithTopologyMode(mode TopologyMode) func(options *DriverOptions) {
+	return func(options *DriverOptions) {
+		options.TopologyMode = mode
 	}
 }
