@@ -115,7 +115,7 @@ func getNodeTopologyFromK8SNode(ctx context.Context) (string, string, error) {
 	}
 
 	if !strings.HasPrefix(node.Spec.ProviderID, cceProviderIDPrefix) {
-		return "", "", fmt.Errorf("known providerID format: %s", node.Spec.ProviderID)
+		return "", "", fmt.Errorf("unknown providerID format: %s", node.Spec.ProviderID)
 	}
 
 	nodeID := node.Spec.ProviderID[len(cceProviderIDPrefix):]
