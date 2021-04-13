@@ -1,0 +1,95 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: csi-cdsplugin-node-server
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: csi-cdsplugin-node-server
+  template:
+    metadata:
+      labels:
+        app: csi-cdsplugin-node-server
+    spec:
+      serviceAccount: csi-cds-external-runner
+      hostNetwork: true
+      restartPolicy: Always
+      priorityClassName: system-node-critical
+      containers:
+        - name: node-driver-registrar
+          image: {{ .Values.image.registrar }}
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--kubelet-registration-path=$(ADDRESS)"
+            - "--v={{ .Values.logLevel }}"
+          env:
+            - name: ADDRESS
+              value: {{ .Values.kubeletDataDirPath }}/plugins/{{ .Values.driverName }}/csi.sock
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: reg-dir
+              mountPath: /registration
+            - name: kubelet-dir
+              mountPath: {{ .Values.kubeletDataDirPath }}
+        - name: csi-cdsplugin
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: true
+          image: {{ .Values.image.plugin }}
+          args :
+            - "--override-driver-name={{ .Values.driverName }}"
+            - "--driver-type=cds"
+            - "--csi-endpoint=$(CSI_ENDPOINT)"
+            - "--driver-mode=node"
+            - "--auth-mode={{ .Values.authMode }}"
+            - "--max-volumes-per-node={{ .Values.maxVolumesPerNode }}"
+            {{- if .Values.clusterID }}
+            - "--cluster-id={{ .Values.clusterID }}"
+            {{- end }}
+            {{- if .Values.region }}
+            - "--region={{ .Values.region }}"
+            {{- end }}
+            {{- if .Values.endpoint.bcc }}
+            - "--bcc-endpoint={{ .Values.endpoint.bcc }}"
+            {{- end }}
+            {{- if .Values.endpoint.cds }}
+            - "--cds-endpoint={{ .Values.endpoint.cds }}"
+            {{- end }}
+            - "--logtostderr"
+            - "--v={{ .Values.logLevel }}"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:/{{ .Values.kubeletDataDirPath }}/plugins/{{ .Values.driverName }}/csi.sock
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: kubelet-dir
+              mountPath: {{ .Values.kubeletDataDirPath }}
+              mountPropagation: "Bidirectional"
+            - name: host-dev
+              mountPath: /dev
+              mountPropagation: "HostToContainer"
+            - name: host-sys
+              mountPath: /sys
+              mountPropagation: "HostToContainer"
+      volumes:
+        - name: kubelet-dir
+          hostPath:
+            path: {{ .Values.kubeletDataDirPath }}
+            type: DirectoryOrCreate
+        - name: reg-dir
+          hostPath:
+            path: {{ .Values.kubeletDataDirPath }}/plugins_registry
+            type: DirectoryOrCreate
+        - name: host-dev
+          hostPath:
+            path: /dev
+        - name: host-sys
+          hostPath:
+            path: /sys

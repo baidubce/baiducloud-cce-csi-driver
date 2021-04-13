@@ -22,8 +22,12 @@ import (
 )
 
 func (d *Driver) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
+	driverName := DriverName
+	if d.options.OverrideDriverName != "" {
+		driverName = d.options.OverrideDriverName
+	}
 	return &csi.GetPluginInfoResponse{
-		Name:          DriverName,
+		Name:          driverName,
 		VendorVersion: d.options.DriverVersion,
 	}, nil
 }
