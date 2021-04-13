@@ -1,0 +1,102 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: csi-cdsplugin-controller-server
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: csi-cdsplugin-controller-server
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: csi-cdsplugin-controller-server
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - csi-cdsplugin-controller-server
+                topologyKey: "kubernetes.io/hostname"
+      priorityClassName: system-node-critical
+      serviceAccount: csi-cds-external-runner
+      hostNetwork: true
+      containers:
+        - name: csi-provisioner
+          image: {{ .Values.image.provisioner }}
+          args:
+            - "--provisioner={{ .Values.driverName }}"
+            - "--csi-address=$(ADDRESS)"
+            - "--feature-gates=Topology=True"
+            - "--volume-name-prefix=pv"
+            - "--strict-topology=true"
+            - "--timeout=60s"
+            - "--enable-leader-election=true"
+            - "--leader-election-type=leases"
+            - "--v={{ .Values.logLevel }}"
+          env:
+            - name: ADDRESS
+              value: /home/cce/kubelet/plugins/{{ .Values.driverName }}/csi.sock
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /home/cce/kubelet/plugins/{{ .Values.driverName }}
+        - name: csi-attacher
+          image: {{ .Values.image.attacher }}
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+            - "--v={{ .Values.logLevel }}"
+          env:
+            - name: ADDRESS
+              value: /home/cce/kubelet/plugins/{{ .Values.driverName }}/csi.sock
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /home/cce/kubelet/plugins/{{ .Values.driverName }}
+        - name: csi-cdsplugin
+          image: {{ .Values.image.plugin }}
+          imagePullPolicy: "Always"
+          args:
+            - "--override-driver-name={{ .Values.driverName }}"
+            - "--driver-type=cds"
+            - "--csi-endpoint=$(CSI_ENDPOINT)"
+            - "--driver-mode=controller"
+            - "--auth-mode={{ .Values.authMode }}"
+            {{- if .Values.clusterID }}
+            - "--cluster-id={{ .Values.clusterID }}"
+            {{- end }}
+            {{- if .Values.region }}
+            - "--region={{ .Values.region }}"
+            {{- end }}
+            {{- if .Values.endpoint.bcc }}
+            - "--bcc-endpoint={{ .Values.endpoint.bcc }}"
+            {{- end }}
+            {{- if .Values.endpoint.cds }}
+            - "--cds-endpoint={{ .Values.endpoint.cds }}"
+            {{- end }}
+            - "--logtostderr"
+            - "--v={{ .Values.logLevel }}"
+          env:
+            - name: CSI_ENDPOINT
+              value: unix://home/cce/kubelet/plugins/{{ .Values.driverName }}/csi.sock
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /home/cce/kubelet/plugins/{{ .Values.driverName }}
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1000Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+      volumes:
+        - name: plugin-dir
+          emptyDir: {}

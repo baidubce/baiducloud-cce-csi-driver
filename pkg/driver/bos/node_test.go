@@ -219,9 +219,9 @@ func TestNodeServer_NodePublishVolume(t *testing.T) {
 					"test-bucket/test/path",
 					"/test/publish/target/path",
 					[]string{
-						"-o endpoint=test.endpoint",
 						"-o tmpdir=/tmp",
 						"-o credentials=" + getCredentialsFilePath("/test/publish/target/path"),
+						"-o endpoint=test.endpoint",
 						"-o meta_expires=0",
 					},
 					nil).Return(fmt.Errorf("test"))
@@ -250,9 +250,9 @@ func TestNodeServer_NodePublishVolume(t *testing.T) {
 					"test-bucket/test/path",
 					"/test/publish/target/path",
 					[]string{
-						"-o endpoint=test.endpoint",
 						"-o tmpdir=/tmp",
 						"-o credentials=" + getCredentialsFilePath("/test/publish/target/path"),
+						"-o endpoint=test.endpoint",
 						"-o meta_expires=0",
 					},
 					nil).Return(nil)

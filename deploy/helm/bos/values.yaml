@@ -1,0 +1,18 @@
+# Default values for bos.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  registrar: registry.baidubce.com/cce-plugin-pro/csi-node-driver-registrar:v2.1.0
+  plugin: registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:v1.0.0
+  bosfs: registry.baidubce.com/cce-plugin-pro/bosfs:1.0.0.10
+
+endpoint:
+  bos: gz.bcebos.com
+
+driverName: bos.csi.baidubce.com
+region:
+maxVolumesPerNode: 10
+logLevel: 5
+kubeletDataDirPath: /home/cce/kubelet
+dockerSocketPath: /var/run/docker.sock

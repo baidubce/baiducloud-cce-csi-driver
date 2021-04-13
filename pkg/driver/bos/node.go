@@ -172,7 +172,6 @@ func (server *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePu
 
 	// 3. Mount target path.
 	options := []string{
-		"-o endpoint=" + server.options.BOSEndpoint,
 		"-o tmpdir=" + bosfsTmpDir,
 	}
 	var sensitiveOptions []string
@@ -197,6 +196,16 @@ func (server *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePu
 		options = append(options, "-o ro")
 	}
 
+	endpointSetByMountFlag := false
+	for _, option := range mountFlags {
+		if strings.HasPrefix(option, "-o endpoint=") {
+			endpointSetByMountFlag = true
+			break
+		}
+	}
+	if !endpointSetByMountFlag {
+		options = append(options, "-o endpoint="+server.options.BOSEndpoint)
+	}
 	options = append(options, mountFlags...)
 
 	glog.V(4).Infof("[%s] Bosfs mount options: %v", ctx.Value(util.TraceIDKey), options)

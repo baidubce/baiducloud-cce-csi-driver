@@ -44,6 +44,7 @@ func main() {
 			common.WithCDSEndpoint(options.CDSEndpoint),
 			common.WithMaxVolumesPerNode(options.MaxVolumesPerNode),
 			common.WithTopologyMode(options.TopologyMode),
+			common.WithOverrideDriverName(options.OverrideDriverName),
 		)
 		if err != nil {
 			glog.Errorf("Failed to init CSI driver, err: %v", err)
@@ -62,6 +63,7 @@ func main() {
 			common.WithMaxVolumesPerNode(options.MaxVolumesPerNode),
 			common.WithBosfsImage(options.BosfsImage),
 			common.WithTopologyMode(options.TopologyMode),
+			common.WithOverrideDriverName(options.OverrideDriverName),
 		)
 		if err != nil {
 			glog.Errorf("Failed to init CSI driver, err: %v", err)
