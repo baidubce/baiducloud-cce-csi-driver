@@ -85,11 +85,24 @@ spec:
             - "--logtostderr"
             - "--v={{ .Values.logLevel }}"
           env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
             - name: CSI_ENDPOINT
               value: unix://home/cce/kubelet/plugins/{{ .Values.driverName }}/csi.sock
+            {{- with $.Values.endpoint.cceGateway }}
+            - name: CCE_GATEWAY_ENDPOINT
+              value: {{ . }}
+            {{- end }}
           volumeMounts:
             - name: plugin-dir
               mountPath: /home/cce/kubelet/plugins/{{ .Values.driverName }}
+            {{- if eq .Values.authMode "gateway" }}
+            - mountPath: /var/run/secrets/cce/cce-plugin-token
+              name: cce-plugin-token
+              readOnly: true
+            {{- end }}
           resources:
             limits:
               cpu: 1000m
@@ -100,3 +113,9 @@ spec:
       volumes:
         - name: plugin-dir
           emptyDir: {}
+        {{- if eq .Values.authMode "gateway" }}
+        - name: cce-plugin-token
+          secret:
+            defaultMode: 256
+            secretName: cce-plugin-token
+        {{- end }}

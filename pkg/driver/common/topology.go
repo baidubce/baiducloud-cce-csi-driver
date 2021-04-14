@@ -37,6 +37,8 @@ const (
 
 	nodeNameENVName     = "NODE_NAME"
 	cceProviderIDPrefix = "cce://"
+
+	cceClusterIDNodeLabelKey = "cluster-id"
 )
 
 type TopologyMode string
@@ -81,6 +83,18 @@ func GetNodeTopology(ctx context.Context, mode TopologyMode) (string, string, er
 	}
 }
 
+func GetCCEClusterIDFromNodeLabels(ctx context.Context) (string, error) {
+	node, err := getSelfNode(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	if clusterID, found := node.Labels[cceClusterIDNodeLabelKey]; found {
+		return clusterID, nil
+	}
+	return "", fmt.Errorf("clusterID is not set in node labels")
+}
+
 func getNodeTopologyFromMetaService(ctx context.Context) (string, string, error) {
 	metaService, err := cloud.NewMetaDataService()
 	if err != nil {
@@ -90,22 +104,7 @@ func getNodeTopologyFromMetaService(ctx context.Context) (string, string, error)
 }
 
 func getNodeTopologyFromK8SNode(ctx context.Context) (string, string, error) {
-	nodeName := os.Getenv(nodeNameENVName)
-	if nodeName == "" {
-		return "", "", fmt.Errorf("env NODE_NAME is not set")
-	}
-
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return "", "", err
-	}
-
-	k8sClient, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return "", "", err
-	}
-
-	node, err := k8sClient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	node, err := getSelfNode(ctx)
 	if err != nil {
 		return "", "", err
 	}
@@ -126,4 +125,23 @@ func getNodeTopologyFromK8SNode(ctx context.Context) (string, string, error) {
 	}
 
 	return nodeID, zone, nil
+}
+
+func getSelfNode(ctx context.Context) (*corev1.Node, error) {
+	nodeName := os.Getenv(nodeNameENVName)
+	if nodeName == "" {
+		return nil, fmt.Errorf("env NODE_NAME is not set")
+	}
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	k8sClient, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return k8sClient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 }

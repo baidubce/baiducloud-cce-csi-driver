@@ -11,6 +11,7 @@ image:
 endpoint:
   bcc: bcc.gz.baidubce.com
   cds: bcc.gz.baidubce.com
+  cceGateway:
 
 
 driverName: cds.csi.baidubce.com

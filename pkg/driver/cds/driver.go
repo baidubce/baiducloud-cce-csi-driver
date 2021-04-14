@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/golang/glog"
 
 	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/cloud"
 	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/driver/common"
@@ -50,6 +51,17 @@ func NewDriver(setOptions ...func(*common.DriverOptions)) (*Driver, error) {
 		if err != nil {
 			return nil, err
 		}
+		if options.AuthMode == cloud.AuthModeCCEGateway && options.ClusterID == "" {
+			glog.V(4).Infof("Using CCE gateway to auth, but clusterID is not set, trying to get it from node labels")
+			clusterID, err := common.GetCCEClusterIDFromNodeLabels(context.Background())
+			if err != nil {
+				glog.Errorf("Failed to get CCE clusterID from node labels, err: %v", err)
+				return nil, err
+			}
+
+			options.ControllerOptions.ClusterID = clusterID
+		}
+
 		controller = newControllerServer(cdsService, bccService, &options)
 	}
 
