@@ -128,12 +128,13 @@ func (cg *bceSigner) Sign(req *http.Request, cred *auth.BceCredentials, opt *aut
 		req.SetHeader(http.BCE_REQUEST_ID, util.NewRequestId())
 	}
 
-	gatewayHost, _ := cg.GetHostAndPort()
+	gatewayHost, gatewayPort := cg.GetHostAndPort()
+	reqHost := fmt.Sprintf("%s:%d", gatewayHost, gatewayPort)
 	// make Sign idempotent as it may be invoked many times on retry
-	if req.Host() != gatewayHost {
+	if req.Host() != reqHost {
 		req.SetHeader(RemoteHostHeaderKey, req.Host())
-		req.SetHeader(http.HOST, gatewayHost)
-		req.SetHost(gatewayHost)
+		req.SetHeader(http.HOST, reqHost)
+		req.SetHost(reqHost)
 	}
 }
 
