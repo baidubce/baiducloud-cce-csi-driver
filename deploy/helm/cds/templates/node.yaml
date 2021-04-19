@@ -46,6 +46,9 @@ spec:
             - "--driver-mode=node"
             - "--auth-mode={{ .Values.authMode }}"
             - "--max-volumes-per-node={{ .Values.maxVolumesPerNode }}"
+            {{- if $.Values.topologyMode }}
+            - "--topology-mode={{ $.Values.topologyMode }}"
+            {{- end }}
             {{- if .Values.clusterID }}
             - "--cluster-id={{ .Values.clusterID }}"
             {{- end }}

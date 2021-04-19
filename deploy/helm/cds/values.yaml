@@ -17,6 +17,7 @@ endpoint:
 driverName: cds.csi.baidubce.com
 clusterID:
 region:
+topologyMode: meta
 authMode: key
 maxVolumesPerNode: 10
 logLevel: 5

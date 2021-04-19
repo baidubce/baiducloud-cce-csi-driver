@@ -12,6 +12,7 @@ endpoint:
 
 driverName: bos.csi.baidubce.com
 region:
+topologyMode: meta
 maxVolumesPerNode: 10
 logLevel: 5
 kubeletDataDirPath: /home/cce/kubelet
