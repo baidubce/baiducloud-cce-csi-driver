@@ -143,6 +143,10 @@ func (server *controllerServer) CreateVolume(ctx context.Context, req *csi.Creat
 		switch key {
 		case StorageTypeKey:
 			storageType = value
+			if value == "ssd" {
+				// compatibility storage type: ssd => cloud_hp1
+				storageType = "cloud_hp1"
+			}
 		case PaymentTimingKey:
 			paymentTiming = value
 		case ReservationLengthKey:
