@@ -39,8 +39,9 @@ var (
 )
 
 var (
-	OverrideDriverNameVar string
-	DriverTypeVar         string
+	OverrideDriverNameVar    string
+	OverrideDriverVersionVar string
+	DriverTypeVar            string
 
 	CSIEndpointVar string
 	ShowVersionVar bool
@@ -94,6 +95,7 @@ func init() {
 	flag.StringVar(&BosfsImageVar, "bosfs-image", defaultBosfsImage, "bosfs image use by CSI bosplugin. (optional)")
 	flag.StringVar(&TopologyModeVar, "topology-mode", "auto", "Node topology provider mode. (optional)")
 	flag.StringVar(&OverrideDriverNameVar, "override-driver-name", "", "Override driver name. (optional)")
+	flag.StringVar(&OverrideDriverVersionVar, "override-driver-version", "", "Override driver version. (optional)")
 
 	flag.BoolVar(&ShowVersionVar, "version", false, "Show CSI driver version.")
 }
@@ -108,6 +110,9 @@ func ParseFlags() (*Options, error) {
 
 	var options Options
 	options.OverrideDriverName = OverrideDriverNameVar
+	if OverrideDriverVersionVar != "" {
+		DriverVersion = OverrideDriverVersionVar
+	}
 	options.CSIEndpoint = CSIEndpointVar
 	options.Region = RegionVar
 	options.ClusterID = ClusterIDVar
