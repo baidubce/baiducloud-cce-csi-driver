@@ -101,7 +101,7 @@ spec:
         - name: docker-sock
           hostPath:
             path: {{ .Values.dockerSocketPath }}
-            type: File
+            type: Socket
         - name: bosfs-cred-dir
           hostPath:
             path: /etc/bosfs/credentials
