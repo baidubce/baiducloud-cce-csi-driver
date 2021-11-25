@@ -48,10 +48,22 @@ spec:
           volumeMounts:
             - name: plugin-dir
               mountPath: /home/cce/kubelet/plugins/cds.csi.baidubce.com
+        - name: csi-resizer
+          image: registry.baidubce.com/cce-plugin-pro/csi-resizer:v1.2.0
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+            - "--v=5"
+          env:
+            - name: ADDRESS
+              value: /home/cce/kubelet/plugins/cds.csi.baidubce.com/csi.sock
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /home/cce/kubelet/plugins/cds.csi.baidubce.com
         - name: csi-attacher
           image: registry.baidubce.com/cce-plugin-pro/csi-attacher:v2.2.1
           args:
-            - "--v=5"
             - "--csi-address=$(ADDRESS)"
             - "--leader-election=true"
             - "--v=5"

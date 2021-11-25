@@ -104,3 +104,62 @@ func TestMounter_GetDevPath(t *testing.T) {
 		})
 	}
 }
+
+func TestMounter_GetDeviceSize(t *testing.T) {
+	cmdOutput := `10737418240
+	`
+
+	type fields struct {
+		Interface exec.Interface
+	}
+	type args struct {
+		ctx        context.Context
+		devicePath string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    int64
+		wantErr bool
+	}{
+		{
+			name: "normal case",
+			fields: fields{
+				Interface: func() exec.Interface {
+					fakeCmd := &exectesting.FakeCmd{}
+					fakeCmd.CombinedOutputScript = append(fakeCmd.OutputScript, func() ([]byte, []byte, error) {
+						return []byte(cmdOutput), nil, nil
+					})
+
+					fakeExec := &exectesting.FakeExec{}
+					fakeExec.CommandScript = append(fakeExec.CommandScript, func(cmd string, args ...string) exec.Cmd {
+						return fakeCmd
+					})
+
+					return fakeExec
+				}(),
+			},
+			args: args{
+				ctx:        context.TODO(),
+				devicePath: "/dev/vdb",
+			},
+			want: int64(10737418240),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &mounter{
+				Interface: tt.fields.Interface,
+			}
+			got, err := m.GetDeviceSize(tt.args.ctx, tt.args.devicePath)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("mounter.GetDeviceSize() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("mounter.GetDeviceSize() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

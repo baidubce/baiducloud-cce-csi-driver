@@ -6,6 +6,7 @@ package mock
 
 import (
 	context "context"
+	cloud "github.com/baidubce/baiducloud-cce-csi-driver/pkg/cloud"
 	api "github.com/baidubce/bce-sdk-go/services/bcc/api"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
@@ -159,6 +160,48 @@ func (m *MockCDSVolume) IsDetaching() bool {
 func (mr *MockCDSVolumeMockRecorder) IsDetaching() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsDetaching", reflect.TypeOf((*MockCDSVolume)(nil).IsDetaching))
+}
+
+// IsInUse mocks base method
+func (m *MockCDSVolume) IsInUse() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsInUse")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsInUse indicates an expected call of IsInUse
+func (mr *MockCDSVolumeMockRecorder) IsInUse() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsInUse", reflect.TypeOf((*MockCDSVolume)(nil).IsInUse))
+}
+
+// IsScaling mocks base method
+func (m *MockCDSVolume) IsScaling() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsScaling")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsScaling indicates an expected call of IsScaling
+func (mr *MockCDSVolumeMockRecorder) IsScaling() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsScaling", reflect.TypeOf((*MockCDSVolume)(nil).IsScaling))
+}
+
+// Resize mocks base method
+func (m *MockCDSVolume) Resize(arg0 context.Context, arg1 *cloud.ResizeCSDVolumeArgs) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Resize", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Resize indicates an expected call of Resize
+func (mr *MockCDSVolumeMockRecorder) Resize(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Resize", reflect.TypeOf((*MockCDSVolume)(nil).Resize), arg0, arg1)
 }
 
 // SizeGB mocks base method

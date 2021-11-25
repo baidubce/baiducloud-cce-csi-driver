@@ -19,11 +19,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
+	mount "k8s.io/mount-utils"
 	"k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 
 	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/driver/common"
 	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/util"
@@ -47,6 +48,8 @@ type Mounter interface {
 	mount.Interface
 	common.FileSystem
 	GetDevPath(ctx context.Context, serial string) (string, error)
+	GetDeviceSize(ctx context.Context, devPath string) (int64, error)
+	ResizeFS(ctx context.Context, devPath, volumeID string) error
 	GetDeviceNameFromMount(ctx context.Context, path string) (string, int, error)
 	FormatAndMount(ctx context.Context, source string, target string, fstype string, options []string) error
 }
@@ -55,6 +58,7 @@ type mounter struct {
 	exec.Interface
 	mount.SafeFormatAndMount
 	common.FileSystem
+	*mount.ResizeFs
 }
 
 func newMounter() Mounter {
@@ -65,6 +69,7 @@ func newMounter() Mounter {
 			Exec:      exec.New(),
 		},
 		FileSystem: common.NewFS(),
+		ResizeFs:   mount.NewResizeFs(exec.New()),
 	}
 }
 
@@ -122,4 +127,25 @@ func (m *mounter) GetDeviceNameFromMount(ctx context.Context, path string) (stri
 func (m *mounter) FormatAndMount(ctx context.Context, source string, target string, fstype string, options []string) error {
 	glog.V(4).Infof("[%s] Mount %s to %s, fstype: %s, options: %+v", ctx.Value(util.TraceIDKey), source, target, fstype, options)
 	return m.SafeFormatAndMount.FormatAndMount(source, target, fstype, options)
+}
+
+// GetDeviceSize is borrowed from "k8s.io/mount-utils".getDeviceSize
+func (m *mounter) GetDeviceSize(ctx context.Context, devicePath string) (int64, error) {
+	output, err := m.CommandContext(ctx, "blockdev", "--getsize64", devicePath).CombinedOutput()
+	outStr := strings.TrimSpace(string(output))
+	if err != nil {
+		return 0, fmt.Errorf("failed to read size of device %s: %s: %s", devicePath, err, outStr)
+	}
+	size, err := strconv.ParseInt(outStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse size of device %s %s: %s", devicePath, outStr, err)
+	}
+	return size, nil
+}
+
+func (m *mounter) ResizeFS(ctx context.Context, devicePath, deviceMountPath string) error {
+	resized, err := m.ResizeFs.Resize(devicePath, deviceMountPath)
+	glog.V(4).Infof("[%s] resize %s mounted on %s: resized=%v, err=%v",
+		ctx.Value(util.TraceIDKey), devicePath, deviceMountPath, resized, err)
+	return err
 }

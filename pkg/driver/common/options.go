@@ -30,12 +30,13 @@ type DriverOptions struct {
 	NodeOptions
 	EndpointOptions
 	ImageOptions
-	OverrideDriverName string
-	DriverVersion      string
-	Mode               DriverMode
-	AuthMode           cloud.AuthMode
-	Region             string
-	TopologyMode       TopologyMode
+	OverrideDriverName    string
+	DriverVersion         string
+	Mode                  DriverMode
+	AuthMode              cloud.AuthMode
+	Region                string
+	TopologyMode          TopologyMode
+	EnableOnlineExpansion bool
 }
 
 type ControllerOptions struct {
@@ -139,5 +140,11 @@ func WithTopologyMode(mode TopologyMode) func(options *DriverOptions) {
 func WithOverrideDriverName(driverName string) func(options *DriverOptions) {
 	return func(options *DriverOptions) {
 		options.OverrideDriverName = driverName
+	}
+}
+
+func WithEnableOnlineExpansion(enableOnlineExpansion bool) func(options *DriverOptions) {
+	return func(options *DriverOptions) {
+		options.EnableOnlineExpansion = enableOnlineExpansion
 	}
 }

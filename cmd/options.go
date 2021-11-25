@@ -61,6 +61,8 @@ var (
 	BosfsImageVar string
 
 	TopologyModeVar string
+
+	EnableOnlineExpansion bool
 )
 
 type Options struct {
@@ -79,6 +81,8 @@ type Options struct {
 	CDSEndpoint        string
 	BOSEndpoint        string
 	BosfsImage         string
+
+	EnableOnlineExpansion bool
 }
 
 func init() {
@@ -98,6 +102,7 @@ func init() {
 	flag.StringVar(&OverrideDriverVersionVar, "override-driver-version", "", "Override driver version. (optional)")
 
 	flag.BoolVar(&ShowVersionVar, "version", false, "Show CSI driver version.")
+	flag.BoolVar(&EnableOnlineExpansion, "enable-online-expansion", false, "Enable online volume expansion. Use it with caution as online expansion may lead to data corruption.")
 }
 
 func ParseFlags() (*Options, error) {
@@ -118,6 +123,7 @@ func ParseFlags() (*Options, error) {
 	options.ClusterID = ClusterIDVar
 	options.MaxVolumesPerNode = MaxVolumesPerNodeVar
 	options.TopologyMode = common.TopologyMode(TopologyModeVar)
+	options.EnableOnlineExpansion = EnableOnlineExpansion
 
 	switch DriverTypeVar {
 	case DriverTypeCDS:

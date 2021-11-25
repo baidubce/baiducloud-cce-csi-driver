@@ -11,31 +11,31 @@ import (
 	reflect "reflect"
 )
 
-// MockVolumeService is a mock of CDSVolumeService interface
-type MockVolumeService struct {
+// MockCDSVolumeService is a mock of CDSVolumeService interface
+type MockCDSVolumeService struct {
 	ctrl     *gomock.Controller
-	recorder *MockVolumeServiceMockRecorder
+	recorder *MockCDSVolumeServiceMockRecorder
 }
 
-// MockVolumeServiceMockRecorder is the mock recorder for MockVolumeService
-type MockVolumeServiceMockRecorder struct {
-	mock *MockVolumeService
+// MockCDSVolumeServiceMockRecorder is the mock recorder for MockCDSVolumeService
+type MockCDSVolumeServiceMockRecorder struct {
+	mock *MockCDSVolumeService
 }
 
-// NewMockVolumeService creates a new mock instance
-func NewMockVolumeService(ctrl *gomock.Controller) *MockVolumeService {
-	mock := &MockVolumeService{ctrl: ctrl}
-	mock.recorder = &MockVolumeServiceMockRecorder{mock}
+// NewMockCDSVolumeService creates a new mock instance
+func NewMockCDSVolumeService(ctrl *gomock.Controller) *MockCDSVolumeService {
+	mock := &MockCDSVolumeService{ctrl: ctrl}
+	mock.recorder = &MockCDSVolumeServiceMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use
-func (m *MockVolumeService) EXPECT() *MockVolumeServiceMockRecorder {
+func (m *MockCDSVolumeService) EXPECT() *MockCDSVolumeServiceMockRecorder {
 	return m.recorder
 }
 
 // CreateVolume mocks base method
-func (m *MockVolumeService) CreateVolume(arg0 context.Context, arg1 *cloud.CreateCDSVolumeArgs, arg2 cloud.Auth) (string, error) {
+func (m *MockCDSVolumeService) CreateVolume(arg0 context.Context, arg1 *cloud.CreateCDSVolumeArgs, arg2 cloud.Auth) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateVolume", arg0, arg1, arg2)
 	ret0, _ := ret[0].(string)
@@ -44,13 +44,13 @@ func (m *MockVolumeService) CreateVolume(arg0 context.Context, arg1 *cloud.Creat
 }
 
 // CreateVolume indicates an expected call of CreateVolume
-func (mr *MockVolumeServiceMockRecorder) CreateVolume(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockCDSVolumeServiceMockRecorder) CreateVolume(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateVolume", reflect.TypeOf((*MockVolumeService)(nil).CreateVolume), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateVolume", reflect.TypeOf((*MockCDSVolumeService)(nil).CreateVolume), arg0, arg1, arg2)
 }
 
 // GetVolumeByID mocks base method
-func (m *MockVolumeService) GetVolumeByID(arg0 context.Context, arg1 string, arg2 cloud.Auth) (cloud.CDSVolume, error) {
+func (m *MockCDSVolumeService) GetVolumeByID(arg0 context.Context, arg1 string, arg2 cloud.Auth) (cloud.CDSVolume, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetVolumeByID", arg0, arg1, arg2)
 	ret0, _ := ret[0].(cloud.CDSVolume)
@@ -59,13 +59,13 @@ func (m *MockVolumeService) GetVolumeByID(arg0 context.Context, arg1 string, arg
 }
 
 // GetVolumeByID indicates an expected call of GetVolumeByID
-func (mr *MockVolumeServiceMockRecorder) GetVolumeByID(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockCDSVolumeServiceMockRecorder) GetVolumeByID(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVolumeByID", reflect.TypeOf((*MockVolumeService)(nil).GetVolumeByID), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVolumeByID", reflect.TypeOf((*MockCDSVolumeService)(nil).GetVolumeByID), arg0, arg1, arg2)
 }
 
 // GetVolumeByName mocks base method
-func (m *MockVolumeService) GetVolumeByName(arg0 context.Context, arg1 string, arg2 cloud.Auth) (cloud.CDSVolume, error) {
+func (m *MockCDSVolumeService) GetVolumeByName(arg0 context.Context, arg1 string, arg2 cloud.Auth) (cloud.CDSVolume, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetVolumeByName", arg0, arg1, arg2)
 	ret0, _ := ret[0].(cloud.CDSVolume)
@@ -74,7 +74,7 @@ func (m *MockVolumeService) GetVolumeByName(arg0 context.Context, arg1 string, a
 }
 
 // GetVolumeByName indicates an expected call of GetVolumeByName
-func (mr *MockVolumeServiceMockRecorder) GetVolumeByName(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockCDSVolumeServiceMockRecorder) GetVolumeByName(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVolumeByName", reflect.TypeOf((*MockVolumeService)(nil).GetVolumeByName), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVolumeByName", reflect.TypeOf((*MockCDSVolumeService)(nil).GetVolumeByName), arg0, arg1, arg2)
 }

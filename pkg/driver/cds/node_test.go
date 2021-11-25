@@ -23,6 +23,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
+	"gotest.tools/assert"
 
 	cdsmock "github.com/baidubce/baiducloud-cce-csi-driver/pkg/driver/cds/mock"
 	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/driver/common"
@@ -912,6 +913,171 @@ func TestNodeServer_NodeUnpublishVolume(t *testing.T) {
 			if !cmp.Equal(resp, tc.expectedResp) {
 				t.Errorf("expected resp: %v, actual: %v, diff: %s", tc.expectedResp, resp, cmp.Diff(tc.expectedResp, resp))
 			}
+		})
+	}
+}
+
+func TestNodeServer_NodeExpandVolume(t *testing.T) {
+	normalExpandRequest := &csi.NodeExpandVolumeRequest{
+		VolumeId:   "v-xxxx",
+		VolumePath: "/test/volume/path",
+		CapacityRange: &csi.CapacityRange{
+			RequiredBytes: 10 * util.GB,
+			LimitBytes:    10 * util.GB,
+		},
+		VolumeCapability: &csi.VolumeCapability{
+			AccessType: &csi.VolumeCapability_Mount{
+				Mount: &csi.VolumeCapability_MountVolume{
+					FsType: "ext4",
+				},
+			},
+		},
+	}
+
+	type mocks struct {
+		ctrl   *gomock.Controller
+		server csi.NodeServer
+	}
+	type args struct {
+		ctx context.Context
+		req *csi.NodeExpandVolumeRequest
+	}
+	tests := []struct {
+		name    string
+		mocks   mocks
+		args    args
+		want    *csi.NodeExpandVolumeResponse
+		wantErr string
+	}{
+		// TODO: Add test cases.
+		{
+			name: "successfully expand volume case",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				mounter := cdsmock.NewMockMounter(ctrl)
+				gomock.InOrder(
+					mounter.EXPECT().GetDeviceNameFromMount(gomock.Any(), "/test/volume/path").Return("/dev/vdb", 2, nil),
+					mounter.EXPECT().GetDeviceSize(gomock.Any(), "/dev/vdb").Return(int64(10*util.GB), nil),
+					mounter.EXPECT().ResizeFS(gomock.Any(), "/dev/vdb", "/test/volume/path"),
+				)
+
+				server := newNodeServer(mounter, &common.DriverOptions{})
+
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			args: args{
+				ctx: context.TODO(),
+				req: normalExpandRequest,
+			},
+			want: &csi.NodeExpandVolumeResponse{
+				CapacityBytes: util.GB * 10,
+			},
+		},
+		{
+			name: "resizefs failed case",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				mounter := cdsmock.NewMockMounter(ctrl)
+				gomock.InOrder(
+					mounter.EXPECT().GetDeviceNameFromMount(gomock.Any(), "/test/volume/path").Return("/dev/vdb", 2, nil),
+					mounter.EXPECT().GetDeviceSize(gomock.Any(), "/dev/vdb").Return(int64(10*util.GB), nil),
+					mounter.EXPECT().ResizeFS(gomock.Any(), "/dev/vdb", "/test/volume/path").Return(fmt.Errorf("resizefs failed")),
+				)
+
+				server := newNodeServer(mounter, &common.DriverOptions{})
+
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			args: args{
+				ctx: context.TODO(),
+				req: normalExpandRequest,
+			},
+			wantErr: "resizefs failed",
+		},
+		{
+			name: "device size does not meet capacity range case",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				mounter := cdsmock.NewMockMounter(ctrl)
+				gomock.InOrder(
+					mounter.EXPECT().GetDeviceNameFromMount(gomock.Any(), "/test/volume/path").Return("/dev/vdb", 2, nil),
+					mounter.EXPECT().GetDeviceSize(gomock.Any(), "/dev/vdb").Return(int64(12*util.GB), nil),
+				)
+
+				server := newNodeServer(mounter, &common.DriverOptions{})
+
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			args: args{
+				ctx: context.TODO(),
+				req: normalExpandRequest,
+			},
+			wantErr: "does not meet capacityRange",
+		},
+		{
+			name: "get device size failed case",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				mounter := cdsmock.NewMockMounter(ctrl)
+				gomock.InOrder(
+					mounter.EXPECT().GetDeviceNameFromMount(gomock.Any(), "/test/volume/path").Return("/dev/vdb", 2, nil),
+					mounter.EXPECT().GetDeviceSize(gomock.Any(), "/dev/vdb").Return(int64(0), fmt.Errorf("get device size failed")),
+				)
+
+				server := newNodeServer(mounter, &common.DriverOptions{})
+
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			args: args{
+				ctx: context.TODO(),
+				req: normalExpandRequest,
+			},
+			wantErr: "get device size failed",
+		},
+		{
+			name: "get device path from volume path failed case",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				mounter := cdsmock.NewMockMounter(ctrl)
+				mounter.EXPECT().GetDeviceNameFromMount(gomock.Any(), "/test/volume/path").Return("", 0, fmt.Errorf("some error"))
+
+				server := newNodeServer(mounter, &common.DriverOptions{})
+
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			args: args{
+				ctx: context.TODO(),
+				req: normalExpandRequest,
+			},
+			wantErr: "some error",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.mocks.ctrl != nil {
+				defer tt.mocks.ctrl.Finish()
+			}
+			got, err := tt.mocks.server.NodeExpandVolume(tt.args.ctx, tt.args.req)
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+			}
+
+			assert.DeepEqual(t, got, tt.want)
 		})
 	}
 }

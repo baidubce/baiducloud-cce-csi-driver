@@ -48,6 +48,19 @@ spec:
           volumeMounts:
             - name: plugin-dir
               mountPath: /home/cce/kubelet/plugins/{{ .Values.driverName }}
+        - name: csi-resizer
+          image: {{ .Values.image.resizer }}
+          args:
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election=true"
+            - "--v={{ .Values.logLevel }}"
+          env:
+            - name: ADDRESS
+              value: /home/cce/kubelet/plugins/{{ .Values.driverName }}/csi.sock
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: plugin-dir
+              mountPath: /home/cce/kubelet/plugins/{{ .Values.driverName }}
         - name: csi-attacher
           image: {{ .Values.image.attacher }}
           args:

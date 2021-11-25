@@ -3,6 +3,7 @@ kind: StorageClass
 metadata:
   name: cds-hp1
 provisioner: cds.csi.baidubce.com
+allowVolumeExpansion: true
 parameters:
   paymentTiming: "Postpaid"         # Postpaid or Prepaid
   storageType: "hp1"                # Support: cloud_hp1, hp1, HDD_Throughput, hdd, std1

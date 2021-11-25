@@ -18,8 +18,6 @@ package cds
 import (
 	"context"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
@@ -42,6 +40,7 @@ var (
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
 	}
 )
 
@@ -323,7 +322,7 @@ func (server *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeG
 	}
 
 	if isDevice {
-		size, err := server.getBlockDeviceSize(ctx, volumePath)
+		size, err := server.mounter.GetDeviceSize(ctx, volumePath)
 		if err != nil {
 			glog.Errorf("[%s] Failed to get volume size, err: %v", ctx.Value(util.TraceIDKey), err)
 			return nil, status.Errorf(codes.Internal, "[%s] failed to get volume size, err: %v", ctx.Value(util.TraceIDKey), err)
@@ -360,6 +359,61 @@ func (server *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeG
 				Used:      metrics.InodesUsed.AsDec().UnscaledBig().Int64(),
 			},
 		},
+	}, nil
+}
+
+func (server *nodeServer) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+	// Parse and check request arguments.
+	volumeID := req.GetVolumeId()
+	if volumeID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "[%s] empty volume id", ctx.Value(util.TraceIDKey))
+	}
+	volumePath := req.GetVolumePath()
+	if volumePath == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "[%s] empty volume path", ctx.Value(util.TraceIDKey))
+	}
+	glog.V(4).Infof("[%s] Start node expansion for volume %s with volumePath=%s",
+		ctx.Value(util.TraceIDKey), volumeID, volumePath)
+	// volumeCap is optional for NodeExpandVolumeRequest so it is not enforced
+	if volumeCap := req.GetVolumeCapability(); volumeCap != nil {
+		glog.V(4).Infof("[%s] got volumeCap: %+v", ctx.Value(util.TraceIDKey), volumeCap)
+		if block := volumeCap.GetBlock(); block != nil {
+			// We do not need to do anything if access type is block.
+			glog.V(4).Infof("[%s] Volume: %s access type is block, skip node expansion", ctx.Value(util.TraceIDKey), volumeID)
+			return &csi.NodeExpandVolumeResponse{}, nil
+		}
+	}
+	devPath, _, err := server.mounter.GetDeviceNameFromMount(ctx, volumePath)
+	if err != nil {
+		glog.Errorf("[%s] Failed to get dev name from volume path: %s failed, err: %v", ctx.Value(util.TraceIDKey), volumePath, err)
+		return nil, status.Errorf(codes.Internal, "[%s] failed to get dev name from volume path: %s failed, err: %v", ctx.Value(util.TraceIDKey), volumePath, err)
+	}
+	// TODO: may check reference count to ensure offline expansion
+	// TODO: may double check device through volumeID/serial
+	devSize, err := server.mounter.GetDeviceSize(ctx, devPath)
+	if err != nil {
+		glog.Errorf("[%s] Failed to get size of dev %s, err: %v", ctx.Value(util.TraceIDKey), devPath, err)
+		return nil, status.Errorf(codes.Internal, "[%s] Failed to get size of dev %s, err: %v", ctx.Value(util.TraceIDKey), devPath, err)
+	}
+	// capRange is optional for NodeExpandVolumeRequest so it is not enforced
+	if capRange := req.GetCapacityRange(); capRange != nil {
+		glog.V(4).Infof("[%s] got capRange: %+v", ctx.Value(util.TraceIDKey), capRange)
+		limitBytes := devSize
+		if v := capRange.GetLimitBytes(); v > 0 {
+			limitBytes = v
+		}
+		if devSize > limitBytes || devSize < capRange.GetRequiredBytes() {
+			return nil, status.Errorf(codes.OutOfRange, "[%s] device=%s size=%d does not meet capacityRange", ctx.Value(util.TraceIDKey), devPath, devSize)
+		}
+	}
+	// ResizeFS
+	glog.V(4).Infof("[%s] Start to ResizeFS for %s mounted on %s", ctx.Value(util.TraceIDKey), devPath, volumePath)
+	if err := server.mounter.ResizeFS(ctx, devPath, volumePath); err != nil {
+		glog.Errorf("[%s] Failed to ResizeFS for %s mounted on %s: %v", ctx.Value(util.TraceIDKey), devPath, volumePath, err)
+		return nil, status.Errorf(codes.Internal, "[%s] failed to resizefs %s, err: %v", ctx.Value(util.TraceIDKey), devPath, err)
+	}
+	return &csi.NodeExpandVolumeResponse{
+		CapacityBytes: devSize,
 	}, nil
 }
 
@@ -491,21 +545,4 @@ func (server *nodeServer) nodePublishMountVolume(ctx context.Context, req *csi.N
 		return nil, status.Errorf(codes.Internal, "[%s] failed to mount %s to %s, err: %v", ctx.Value(util.TraceIDKey), source, targetPath, err)
 	}
 	return &csi.NodePublishVolumeResponse{}, nil
-}
-
-func (server *nodeServer) getBlockDeviceSize(ctx context.Context, path string) (int64, error) {
-	cmd := server.mounter.Command("blockdev", "--getsize64", path)
-	output, err := cmd.Output()
-	if err != nil {
-		glog.Errorf("[%s] Failed to get size of volume, path: %s, output: %s, err: %v", ctx.Value(util.TraceIDKey), path, output, err)
-		return -1, err
-	}
-
-	trimSpaceOutput := strings.TrimSpace(string(output))
-	size, err := strconv.ParseInt(trimSpaceOutput, 10, 64)
-	if err != nil {
-		glog.Errorf("[%s] Failed to parse size %s as int, err: %v", ctx.Value(util.TraceIDKey), trimSpaceOutput, err)
-		return -1, err
-	}
-	return size, nil
 }

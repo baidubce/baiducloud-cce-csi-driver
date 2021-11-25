@@ -22,17 +22,17 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/cloud"
+	cloudmock "github.com/baidubce/baiducloud-cce-csi-driver/pkg/cloud/mock"
+	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/driver/common"
+	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/util"
 	"github.com/baidubce/bce-sdk-go/bce"
 	bccapi "github.com/baidubce/bce-sdk-go/services/bcc/api"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
+	"gotest.tools/assert"
 	corev1 "k8s.io/api/core/v1"
-
-	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/cloud"
-	cloudmock "github.com/baidubce/baiducloud-cce-csi-driver/pkg/cloud/mock"
-	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/driver/common"
-	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/util"
 )
 
 func TestControllerServer_CreateVolume(t *testing.T) {
@@ -151,7 +151,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 			name: "volume is not found in cloud, but creating cache is set. (DB synchronization)",
 			mocks: func() mocks {
 				ctrl := gomock.NewController(t)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByName(gomock.Any(), gomock.Eq("pv-xxxx"), gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusNotFound})
 				server := &controllerServer{
 					UnimplementedControllerServer: csi.UnimplementedControllerServer{},
@@ -174,7 +174,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 			name: "failed to check volume whether exist in cloud",
 			mocks: func() mocks {
 				ctrl := gomock.NewController(t)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByName(gomock.Any(), gomock.Eq("pv-xxxx"), gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusBadRequest})
 				server := &controllerServer{
 					UnimplementedControllerServer: csi.UnimplementedControllerServer{},
@@ -202,7 +202,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 				cdsVolume.EXPECT().SizeGB().Return(1)
 				cdsVolume.EXPECT().ID().Return("v-xxxx")
 				cdsVolume.EXPECT().Zone().Return("zoneA")
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByName(gomock.Any(), gomock.Eq("pv-xxxx"), gomock.Any()).Return(cdsVolume, nil)
 				server := &controllerServer{
 					UnimplementedControllerServer: csi.UnimplementedControllerServer{},
@@ -237,7 +237,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 			name: "create volume failed",
 			mocks: func() mocks {
 				ctrl := gomock.NewController(t)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByName(gomock.Any(), gomock.Eq("pv-xxxx"), gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusNotFound})
 				volumeService.EXPECT().CreateVolume(gomock.Any(), gomock.Eq(&cloud.CreateCDSVolumeArgs{
 					Name:                "pv-xxxx",
@@ -280,7 +280,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 			name: "volume is not found after creating",
 			mocks: func() mocks {
 				ctrl := gomock.NewController(t)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByName(gomock.Any(), gomock.Eq("pv-xxxx"), gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusNotFound})
 				volumeService.EXPECT().CreateVolume(gomock.Any(), gomock.Eq(&cloud.CreateCDSVolumeArgs{
 					Name:                "pv-xxxx",
@@ -323,7 +323,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 			name: "fetch volume info from cloud failed after creating",
 			mocks: func() mocks {
 				ctrl := gomock.NewController(t)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByName(gomock.Any(), gomock.Eq("pv-xxxx"), gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusNotFound})
 				volumeService.EXPECT().CreateVolume(gomock.Any(), gomock.Eq(&cloud.CreateCDSVolumeArgs{
 					Name:                "pv-xxxx",
@@ -366,7 +366,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 			name: "create volume succeed",
 			mocks: func() mocks {
 				ctrl := gomock.NewController(t)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByName(gomock.Any(), gomock.Eq("pv-xxxx"), gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusNotFound})
 				volumeService.EXPECT().CreateVolume(gomock.Any(), gomock.Eq(&cloud.CreateCDSVolumeArgs{
 					Name:                "pv-xxxx",
@@ -464,7 +464,7 @@ func TestControllerServer_DeleteVolume(t *testing.T) {
 			name: "volume is already deleted",
 			mocks: func() mocks {
 				ctrl := gomock.NewController(t)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusNotFound})
 				server := &controllerServer{
 					UnimplementedControllerServer: csi.UnimplementedControllerServer{},
@@ -489,7 +489,7 @@ func TestControllerServer_DeleteVolume(t *testing.T) {
 			name: "failed to check whether volume exists",
 			mocks: func() mocks {
 				ctrl := gomock.NewController(t)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusBadRequest})
 				server := &controllerServer{
 					UnimplementedControllerServer: csi.UnimplementedControllerServer{},
@@ -517,7 +517,7 @@ func TestControllerServer_DeleteVolume(t *testing.T) {
 				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
 				cdsVolume.EXPECT().Detail().Return(nil)
 				cdsVolume.EXPECT().Delete(gomock.Any()).Return(fmt.Errorf("test"))
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
 				server := &controllerServer{
 					UnimplementedControllerServer: csi.UnimplementedControllerServer{},
@@ -545,7 +545,7 @@ func TestControllerServer_DeleteVolume(t *testing.T) {
 				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
 				cdsVolume.EXPECT().Detail().Return(nil)
 				cdsVolume.EXPECT().Delete(gomock.Any()).Return(nil)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
 				server := &controllerServer{
 					UnimplementedControllerServer: csi.UnimplementedControllerServer{},
@@ -674,7 +674,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				nodeService := cloudmock.NewMockNodeService(ctrl)
 				nodeService.EXPECT().GetNodeByID(gomock.Any(), "i-xxxx", gomock.Any()).Return(nil, nil)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusNotFound})
 				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
 				return mocks{
@@ -692,7 +692,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				nodeService := cloudmock.NewMockNodeService(ctrl)
 				nodeService.EXPECT().GetNodeByID(gomock.Any(), "i-xxxx", gomock.Any()).Return(nil, nil)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusBadRequest})
 				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
 				return mocks{
@@ -724,7 +724,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 						},
 					},
 				}).AnyTimes()
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
 				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
 				return mocks{
@@ -761,7 +761,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 						},
 					},
 				}).AnyTimes()
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
 				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
 				return mocks{
@@ -782,7 +782,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
 				cdsVolume.EXPECT().IsAttached().Return(false)
 				cdsVolume.EXPECT().IsAttaching().Return(true)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
 				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
 				return mocks{
@@ -805,7 +805,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 				cdsVolume.EXPECT().IsAttaching().Return(false)
 				cdsVolume.EXPECT().IsAvailable().Return(true)
 				cdsVolume.EXPECT().Attach(gomock.Any(), "i-xxxx").Return(nil, fmt.Errorf("test"))
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
 
 				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
@@ -829,7 +829,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 				cdsVolume.EXPECT().IsAttaching().Return(false)
 				cdsVolume.EXPECT().IsAvailable().Return(true)
 				cdsVolume.EXPECT().Attach(gomock.Any(), "i-xxxx").Return(nil, nil)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
 
 				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
@@ -885,7 +885,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 			name: "volume not exists",
 			mocks: func() mocks {
 				ctrl := gomock.NewController(t)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusNotFound})
 
 				server := newControllerServer(volumeService, nil, &common.DriverOptions{})
@@ -902,7 +902,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 			name: "failed to check whether volume exists",
 			mocks: func() mocks {
 				ctrl := gomock.NewController(t)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusBadRequest})
 
 				server := newControllerServer(volumeService, nil, &common.DriverOptions{})
@@ -919,7 +919,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 			name: "node not exists",
 			mocks: func() mocks {
 				ctrl := gomock.NewController(t)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(nil, nil)
 				nodeService := cloudmock.NewMockNodeService(ctrl)
 				nodeService.EXPECT().GetNodeByID(gomock.Any(), "i-xxxx", gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusNotFound})
@@ -937,7 +937,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 			name: "failed to check whether node exists",
 			mocks: func() mocks {
 				ctrl := gomock.NewController(t)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(nil, nil)
 				nodeService := cloudmock.NewMockNodeService(ctrl)
 				nodeService.EXPECT().GetNodeByID(gomock.Any(), "i-xxxx", gomock.Any()).Return(nil, &bce.BceServiceError{StatusCode: http.StatusBadRequest})
@@ -961,7 +961,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 					Status:      bccapi.VolumeStatusAVAILABLE,
 					Attachments: []bccapi.VolumeAttachmentModel{},
 				}).AnyTimes()
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
 				nodeService := cloudmock.NewMockNodeService(ctrl)
 				nodeService.EXPECT().GetNodeByID(gomock.Any(), "i-xxxx", gomock.Any()).Return(nil, nil)
@@ -993,7 +993,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 					},
 				}).AnyTimes()
 				cdsVolume.EXPECT().IsDetaching().Return(true)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
 				nodeService := cloudmock.NewMockNodeService(ctrl)
 				nodeService.EXPECT().GetNodeByID(gomock.Any(), "i-xxxx", gomock.Any()).Return(nil, nil)
@@ -1026,7 +1026,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 				}).AnyTimes()
 				cdsVolume.EXPECT().IsDetaching().Return(false)
 				cdsVolume.EXPECT().Detach(gomock.Any(), "i-xxxx").Return(fmt.Errorf("test"))
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
 				nodeService := cloudmock.NewMockNodeService(ctrl)
 				nodeService.EXPECT().GetNodeByID(gomock.Any(), "i-xxxx", gomock.Any()).Return(nil, nil)
@@ -1059,7 +1059,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 				}).AnyTimes()
 				cdsVolume.EXPECT().IsDetaching().Return(false)
 				cdsVolume.EXPECT().Detach(gomock.Any(), "i-xxxx").Return(nil)
-				volumeService := cloudmock.NewMockVolumeService(ctrl)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
 				nodeService := cloudmock.NewMockNodeService(ctrl)
 				nodeService.EXPECT().GetNodeByID(gomock.Any(), "i-xxxx", gomock.Any()).Return(nil, nil)
@@ -1086,6 +1086,301 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 			if !cmp.Equal(resp, tc.expectedResp) {
 				t.Errorf("expected resp: %v, actual: %v, diff: %s", tc.expectedResp, resp, cmp.Diff(tc.expectedResp, resp))
 			}
+		})
+	}
+}
+
+func TestControllerServer_ControllerExpandVolume(t *testing.T) {
+	type mocks struct {
+		ctrl   *gomock.Controller
+		server csi.ControllerServer
+	}
+
+	from5to10ExpandReq := &csi.ControllerExpandVolumeRequest{
+		VolumeId: "v-xxxx",
+		CapacityRange: &csi.CapacityRange{
+			RequiredBytes: 10 * util.GB,
+			LimitBytes:    10 * util.GB,
+		},
+		Secrets: map[string]string{
+			common.AccessKey: "test-ak",
+			common.SecretKey: "test-sk",
+		},
+		VolumeCapability: &csi.VolumeCapability{
+			AccessType: &csi.VolumeCapability_Mount{
+				Mount: &csi.VolumeCapability_MountVolume{
+					FsType: "ext4",
+				},
+			},
+		},
+	}
+
+	type args struct {
+		ctx context.Context
+		req *csi.ControllerExpandVolumeRequest
+	}
+	tests := []struct {
+		name    string
+		mocks   mocks
+		args    args
+		want    *csi.ControllerExpandVolumeResponse
+		wantErr string
+	}{
+		// TODO: Add test cases.
+		{
+			name: "successfully trigger expansion from 5GB to 10GB",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
+				gomock.InOrder(
+					cdsVolume.EXPECT().IsScaling().Return(false),
+					cdsVolume.EXPECT().SizeGB().Return(5),
+					cdsVolume.EXPECT().IsAvailable().Return(true),
+					cdsVolume.EXPECT().Detail().Return(&bccapi.VolumeModel{
+						StorageType: bccapi.StorageTypeHP1,
+					}),
+					cdsVolume.EXPECT().Resize(gomock.Any(), &cloud.ResizeCSDVolumeArgs{
+						NewCdsSizeInGB: 10,
+						NewVolumeType:  bccapi.StorageTypeHP1,
+					}),
+				)
+
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
+				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
+
+				nodeService := cloudmock.NewMockNodeService(ctrl)
+
+				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			args: args{
+				ctx: context.TODO(),
+				req: from5to10ExpandReq,
+			},
+			wantErr: "volume is scaling", // error due to expansion is async operation
+		},
+		{
+			name: "volume is scaling from 5GB to 10GB",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
+				cdsVolume.EXPECT().IsScaling().Return(true)
+
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
+				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
+
+				nodeService := cloudmock.NewMockNodeService(ctrl)
+
+				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			args: args{
+				ctx: context.TODO(),
+				req: from5to10ExpandReq,
+			},
+			wantErr: "volume is scaling", // error due to expansion is async operation
+		},
+		{
+			name: "successfully complete expansion from 5GB to 10GB",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
+				gomock.InOrder(
+					cdsVolume.EXPECT().IsScaling().Return(false),
+					cdsVolume.EXPECT().SizeGB().Return(10),
+				)
+
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
+				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
+
+				nodeService := cloudmock.NewMockNodeService(ctrl)
+
+				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			args: args{
+				ctx: context.TODO(),
+				req: from5to10ExpandReq,
+			},
+			want: &csi.ControllerExpandVolumeResponse{
+				CapacityBytes:         util.SizeGBToBytes(10),
+				NodeExpansionRequired: true,
+			},
+		},
+		{
+			name: "abort due to volume is attaching",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
+				gomock.InOrder(
+					cdsVolume.EXPECT().IsScaling().Return(false),
+					cdsVolume.EXPECT().SizeGB().Return(5),
+					cdsVolume.EXPECT().IsAvailable().Return(false),
+					cdsVolume.EXPECT().Detail().Return(&bccapi.VolumeModel{
+						Status: bccapi.VolumeStatusATTACHING,
+					}),
+				)
+
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
+				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
+
+				nodeService := cloudmock.NewMockNodeService(ctrl)
+
+				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			args: args{
+				ctx: context.TODO(),
+				req: from5to10ExpandReq,
+			},
+			wantErr: "Abort expansion for volume v-xxxx due to its status is Attaching",
+		},
+		{
+			name: "abort due to volume size is larger than want size",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
+				gomock.InOrder(
+					cdsVolume.EXPECT().IsScaling().Return(false),
+					cdsVolume.EXPECT().SizeGB().Return(12),
+				)
+
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
+				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
+
+				nodeService := cloudmock.NewMockNodeService(ctrl)
+
+				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			args: args{
+				ctx: context.TODO(),
+				req: from5to10ExpandReq,
+			},
+			wantErr: "must be no less than current size=12GB",
+		},
+		{
+			name: "error occurs in GetVolumeByID",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
+				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(nil, fmt.Errorf("some error occurs in GetVolumeByID"))
+
+				nodeService := cloudmock.NewMockNodeService(ctrl)
+
+				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			args: args{
+				ctx: context.TODO(),
+				req: from5to10ExpandReq,
+			},
+			wantErr: "some error occurs in GetVolumeByID",
+		},
+		{
+			name: "online expansion is enabled and successfully trigger online expansion from 5GB to 10GB",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
+				gomock.InOrder(
+					cdsVolume.EXPECT().IsScaling().Return(false),
+					cdsVolume.EXPECT().SizeGB().Return(5),
+					cdsVolume.EXPECT().IsAvailable().Return(false),
+					cdsVolume.EXPECT().IsInUse().Return(true),
+					cdsVolume.EXPECT().Detail().Return(&bccapi.VolumeModel{
+						StorageType: bccapi.StorageTypeHP1,
+					}),
+					cdsVolume.EXPECT().Resize(gomock.Any(), &cloud.ResizeCSDVolumeArgs{
+						NewCdsSizeInGB: 10,
+						NewVolumeType:  bccapi.StorageTypeHP1,
+					}),
+				)
+
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
+				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
+
+				nodeService := cloudmock.NewMockNodeService(ctrl)
+
+				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{
+					EnableOnlineExpansion: true,
+				})
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			args: args{
+				ctx: context.TODO(),
+				req: from5to10ExpandReq,
+			},
+			wantErr: "volume is scaling", // error due to expansion is async operation
+		},
+		{
+			name: "error occurs in cds resize request",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
+				gomock.InOrder(
+					cdsVolume.EXPECT().IsScaling().Return(false),
+					cdsVolume.EXPECT().SizeGB().Return(5),
+					cdsVolume.EXPECT().IsAvailable().Return(true),
+					cdsVolume.EXPECT().Detail().Return(&bccapi.VolumeModel{
+						StorageType: bccapi.StorageTypeHP1,
+					}),
+					cdsVolume.EXPECT().Resize(gomock.Any(), &cloud.ResizeCSDVolumeArgs{
+						NewCdsSizeInGB: 10,
+						NewVolumeType:  bccapi.StorageTypeHP1,
+					}).Return(fmt.Errorf("some error occurs in Resize")),
+				)
+
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
+				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
+
+				nodeService := cloudmock.NewMockNodeService(ctrl)
+
+				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			args: args{
+				ctx: context.TODO(),
+				req: from5to10ExpandReq,
+			},
+			wantErr: "some error occurs in Resize", // error due to expansion is async operation
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.mocks.ctrl != nil {
+				defer tt.mocks.ctrl.Finish()
+			}
+			got, err := tt.mocks.server.ControllerExpandVolume(tt.args.ctx, tt.args.req)
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+			}
+
+			assert.DeepEqual(t, got, tt.want)
 		})
 	}
 }

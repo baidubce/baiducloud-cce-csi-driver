@@ -14,10 +14,12 @@ require (
 	github.com/opencontainers/image-spec v1.0.1
 	github.com/satori/go.uuid v1.2.0
 	google.golang.org/grpc v1.35.0
+	gotest.tools v2.2.0+incompatible
 	k8s.io/api v0.21.2
 	k8s.io/apimachinery v0.21.2
 	k8s.io/client-go v0.21.2
 	k8s.io/kubernetes v1.21.2
+	k8s.io/mount-utils v0.21.2
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 )
 

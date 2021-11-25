@@ -49,6 +49,7 @@ var (
 	controllerCaps = []csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
+		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 	}
 )
 
@@ -57,11 +58,12 @@ type controllerServer struct {
 
 	options *common.ControllerOptions
 
-	volumeService       cloud.CDSVolumeService
-	nodeService         cloud.NodeService
-	getAuth             func(map[string]string) (cloud.Auth, error)
-	creatingVolumeCache *sync.Map
-	inProcessRequests   *util.KeyMutex
+	volumeService         cloud.CDSVolumeService
+	nodeService           cloud.NodeService
+	getAuth               func(map[string]string) (cloud.Auth, error)
+	creatingVolumeCache   *sync.Map
+	inProcessRequests     *util.KeyMutex
+	enableOnlineExpansion bool
 }
 
 func newControllerServer(volumeService cloud.CDSVolumeService, nodeService cloud.NodeService, options *common.DriverOptions) csi.ControllerServer {
@@ -85,6 +87,7 @@ func newControllerServer(volumeService cloud.CDSVolumeService, nodeService cloud
 		getAuth:                       getAuth,
 		creatingVolumeCache:           &sync.Map{},
 		inProcessRequests:             util.NewKeyMutex(),
+		enableOnlineExpansion:         options.EnableOnlineExpansion,
 	}
 }
 
@@ -459,6 +462,88 @@ func (server *controllerServer) ControllerUnpublishVolume(ctx context.Context, r
 	return nil, status.Errorf(codes.Aborted, "[%s] volume is detaching", ctx.Value(util.TraceIDKey))
 }
 
+func (server *controllerServer) ControllerExpandVolume(ctx context.Context, req *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	volumeID := req.GetVolumeId()
+	if volumeID == "" {
+		return nil, status.Error(codes.InvalidArgument, "empty volume id")
+	}
+
+	// volumeCap is optional for ControllerExpandVolumeRequest so it is not enforced
+	var isBlock bool
+	if volumeCap := req.GetVolumeCapability(); volumeCap != nil {
+		if block := volumeCap.GetBlock(); block != nil {
+			isBlock = true
+		}
+	}
+
+	auth, err := server.getAuth(req.GetSecrets())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+	}
+
+	// Check whether volume exists.
+	volume, err := server.volumeService.GetVolumeByID(ctx, volumeID, auth)
+	if err != nil {
+		if cloud.ErrIsNotFound(err) {
+			glog.Errorf("[%s] Volume: %s not exists", ctx.Value(util.TraceIDKey), volumeID)
+			return nil, status.Error(codes.NotFound, "volume not exists")
+		}
+		glog.Errorf("[%s] Failed to get volume from cloud, id: %s, err: %v", ctx.Value(util.TraceIDKey), volumeID, err)
+		return nil, status.Errorf(codes.Internal, "failed to get volume from cloud, err: %v", err)
+	}
+
+	// Check if volume is scaling.
+	if volume.IsScaling() {
+		return nil, status.Errorf(codes.Aborted, "[%s] volume is scaling", ctx.Value(util.TraceIDKey))
+	}
+
+	capRange := req.GetCapacityRange()
+	if capRange == nil {
+		glog.Error("CapacityRange cannot be nil")
+		return nil, status.Error(codes.InvalidArgument, "CapacityRange cannot be nil")
+	}
+	oldSizeInGB := volume.SizeGB()
+	if sizeInGBMeetCapRange(int64(oldSizeInGB), capRange) {
+		// volume size has met CapacityRange, no-op
+		glog.V(4).Infof("[%s] disk size=%dGB has met capacityRange, skip resizing",
+			ctx.Value(util.TraceIDKey), oldSizeInGB)
+		return &csi.ControllerExpandVolumeResponse{
+			CapacityBytes:         util.SizeGBToBytes(int64(oldSizeInGB)),
+			NodeExpansionRequired: !isBlock,
+		}, nil
+	}
+	newSizeInGB, err := getVolumeSizeGB(capRange)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "[%s] Invalid volume size, err: %v", ctx.Value(util.TraceIDKey), err)
+	}
+	if newSizeInGB < oldSizeInGB {
+		return nil, status.Errorf(codes.InvalidArgument, "[%s] Invalid want size %dGB: must be no less than current size=%dGB", ctx.Value(util.TraceIDKey), newSizeInGB, oldSizeInGB)
+	}
+
+	// Check if volume status is ready for expansion.
+	canResize := (volume.IsAvailable() || (server.enableOnlineExpansion && volume.IsInUse()))
+	if !canResize {
+		volumeStatus := volume.Detail().Status
+		glog.Errorf("[%s] Abort expansion for volume %s due to its status is %s", ctx.Value(util.TraceIDKey), volumeID, volumeStatus)
+		return nil, status.Errorf(codes.FailedPrecondition, "[%s] Abort expansion for volume %s due to its status is %s", ctx.Value(util.TraceIDKey), volumeID, volumeStatus)
+	}
+
+	// Do cds resize.
+	glog.V(4).Infof("[%s] Going to resize cds volume %s to %d GB", ctx.Value(util.TraceIDKey), volumeID, newSizeInGB)
+	args := &cloud.ResizeCSDVolumeArgs{
+		NewVolumeType:  volume.Detail().StorageType, // retain storageType
+		NewCdsSizeInGB: newSizeInGB,
+	}
+	if err := volume.Resize(ctx, args); err != nil {
+		glog.Errorf("[%s] Failed to resize volume=%s to %+v, err: %v", ctx.Value(util.TraceIDKey), volumeID, args, err)
+		// TODO: check out of range error
+		return nil, status.Errorf(codes.Internal, "[%s] Failed to resize volume, err: %v", ctx.Value(util.TraceIDKey), err)
+	}
+
+	// Resize is asynchronous. Let CO to retry before volume has been resized.
+	return nil, status.Errorf(codes.Aborted, "[%s] volume is scaling", ctx.Value(util.TraceIDKey))
+}
+
 func (server *controllerServer) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 	volumeID := req.GetVolumeId()
 	if volumeID == "" {
@@ -518,6 +603,20 @@ func getVolumeSizeGB(capRange *csi.CapacityRange) (int, error) {
 		return 0, fmt.Errorf("volume size after rounding up to GB is over capacity limit")
 	}
 	return int(util.RoundUpGB(sizeRequiredBytes)), nil
+}
+
+func sizeInGBMeetCapRange(sizeInGB int64, capRange *csi.CapacityRange) bool {
+	if capRange == nil {
+		return false
+	}
+
+	sizeInBytes := util.SizeGBToBytes(sizeInGB)
+	sizeRequiredBytes := capRange.GetRequiredBytes()
+	sizeLimitBytes := capRange.GetLimitBytes()
+	if sizeLimitBytes == 0 {
+		sizeLimitBytes = sizeInBytes
+	}
+	return sizeInBytes >= sizeRequiredBytes && sizeInBytes <= sizeLimitBytes
 }
 
 func checkVolumeCapabilities(requiredCaps []*csi.VolumeCapability) error {

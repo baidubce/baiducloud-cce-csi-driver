@@ -45,6 +45,7 @@ func main() {
 			common.WithMaxVolumesPerNode(options.MaxVolumesPerNode),
 			common.WithTopologyMode(options.TopologyMode),
 			common.WithOverrideDriverName(options.OverrideDriverName),
+			common.WithEnableOnlineExpansion(options.EnableOnlineExpansion),
 		)
 		if err != nil {
 			glog.Errorf("Failed to init CSI driver, err: %v", err)

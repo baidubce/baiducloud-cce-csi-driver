@@ -43,12 +43,15 @@ type CDSVolume interface {
 	Delete(ctx context.Context) error
 	Attach(ctx context.Context, instanceID string) (*bccapi.VolumeAttachmentModel, error)
 	Detach(ctx context.Context, instanceID string) error
+	Resize(ctx context.Context, args *ResizeCSDVolumeArgs) error
 
 	ID() string
 	Zone() string
 	SizeGB() int
 	Detail() *bccapi.VolumeModel
 	IsAvailable() bool
+	IsInUse() bool
+	IsScaling() bool
 	IsAttached() bool
 	IsAttaching() bool
 	IsDetaching() bool
@@ -67,6 +70,11 @@ type CreateCDSVolumeArgs struct {
 	ReservationLength   int
 	ReservationTimeUnit string
 	Tags                map[string]string
+}
+
+type ResizeCSDVolumeArgs struct {
+	NewCdsSizeInGB int
+	NewVolumeType  bccapi.StorageType
 }
 
 type Billing struct {
@@ -229,6 +237,19 @@ func (v *cdsVolume) Detach(ctx context.Context, instanceID string) error {
 	return v.client.DetachCDSVolume(v.Id, args)
 }
 
+func (v *cdsVolume) Resize(ctx context.Context, args *ResizeCSDVolumeArgs) error {
+	if v.Id == "" {
+		return fmt.Errorf("empty volume id")
+	}
+
+	reqArgs := &bccapi.ResizeCSDVolumeArgs{
+		NewCdsSizeInGB: args.NewCdsSizeInGB,
+		NewVolumeType:  args.NewVolumeType,
+		// TODO: if client token is necessary
+	}
+	return v.client.ResizeCDSVolume(v.Id, reqArgs)
+}
+
 func (v *cdsVolume) ID() string {
 	return v.Id
 }
@@ -244,6 +265,14 @@ func (v *cdsVolume) SizeGB() int {
 
 func (v *cdsVolume) Detail() *bccapi.VolumeModel {
 	return &v.VolumeModel
+}
+
+func (v *cdsVolume) IsInUse() bool {
+	return v.Status == bccapi.VolumeStatusINUSE
+}
+
+func (v *cdsVolume) IsScaling() bool {
+	return v.Status == bccapi.VolumeStatusSCALING
 }
 
 func (v *cdsVolume) IsAvailable() bool {

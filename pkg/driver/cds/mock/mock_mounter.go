@@ -7,8 +7,8 @@ package mock
 import (
 	context "context"
 	gomock "github.com/golang/mock/gomock"
+	mount_utils "k8s.io/mount-utils"
 	exec "k8s.io/utils/exec"
-	mount "k8s.io/utils/mount"
 	reflect "reflect"
 )
 
@@ -116,6 +116,20 @@ func (mr *MockMounterMockRecorder) MountSensitive(source, target, fstype, option
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MountSensitive", reflect.TypeOf((*MockMounter)(nil).MountSensitive), source, target, fstype, options, sensitiveOptions)
 }
 
+// MountSensitiveWithoutSystemd mocks base method
+func (m *MockMounter) MountSensitiveWithoutSystemd(source, target, fstype string, options, sensitiveOptions []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MountSensitiveWithoutSystemd", source, target, fstype, options, sensitiveOptions)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MountSensitiveWithoutSystemd indicates an expected call of MountSensitiveWithoutSystemd
+func (mr *MockMounterMockRecorder) MountSensitiveWithoutSystemd(source, target, fstype, options, sensitiveOptions interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MountSensitiveWithoutSystemd", reflect.TypeOf((*MockMounter)(nil).MountSensitiveWithoutSystemd), source, target, fstype, options, sensitiveOptions)
+}
+
 // Unmount mocks base method
 func (m *MockMounter) Unmount(target string) error {
 	m.ctrl.T.Helper()
@@ -131,10 +145,10 @@ func (mr *MockMounterMockRecorder) Unmount(target interface{}) *gomock.Call {
 }
 
 // List mocks base method
-func (m *MockMounter) List() ([]mount.MountPoint, error) {
+func (m *MockMounter) List() ([]mount_utils.MountPoint, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List")
-	ret0, _ := ret[0].([]mount.MountPoint)
+	ret0, _ := ret[0].([]mount_utils.MountPoint)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -273,6 +287,35 @@ func (m *MockMounter) GetDevPath(ctx context.Context, serial string) (string, er
 func (mr *MockMounterMockRecorder) GetDevPath(ctx, serial interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDevPath", reflect.TypeOf((*MockMounter)(nil).GetDevPath), ctx, serial)
+}
+
+// GetDeviceSize mocks base method
+func (m *MockMounter) GetDeviceSize(ctx context.Context, devPath string) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDeviceSize", ctx, devPath)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDeviceSize indicates an expected call of GetDeviceSize
+func (mr *MockMounterMockRecorder) GetDeviceSize(ctx, devPath interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeviceSize", reflect.TypeOf((*MockMounter)(nil).GetDeviceSize), ctx, devPath)
+}
+
+// ResizeFS mocks base method
+func (m *MockMounter) ResizeFS(ctx context.Context, devPath, volumeID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResizeFS", ctx, devPath, volumeID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ResizeFS indicates an expected call of ResizeFS
+func (mr *MockMounterMockRecorder) ResizeFS(ctx, devPath, volumeID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResizeFS", reflect.TypeOf((*MockMounter)(nil).ResizeFS), ctx, devPath, volumeID)
 }
 
 // GetDeviceNameFromMount mocks base method
