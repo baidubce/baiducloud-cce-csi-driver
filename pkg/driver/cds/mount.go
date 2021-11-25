@@ -43,6 +43,7 @@ var (
 //go:generate mockgen -destination=./mock/mock_mounter.go -package=mock github.com/baidubce/baiducloud-cce-csi-driver/pkg/driver/cds Mounter
 
 type Mounter interface {
+	exec.Interface
 	mount.Interface
 	common.FileSystem
 	GetDevPath(ctx context.Context, serial string) (string, error)

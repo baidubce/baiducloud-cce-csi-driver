@@ -18,12 +18,16 @@ package cds
 import (
 	"context"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 
 	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/driver/common"
 	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/util"
@@ -37,6 +41,7 @@ var (
 	// nodeCaps represents the capability of node service.
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
 	}
 )
 
@@ -287,6 +292,77 @@ func (server *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.Node
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
+func (server *nodeServer) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	volumeID := req.GetVolumeId()
+	if volumeID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "[%s] volumeID is empty", ctx.Value(util.TraceIDKey))
+	}
+
+	volumePath := req.GetVolumePath()
+	if volumePath == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "[%s] volumePath is empty", ctx.Value(util.TraceIDKey))
+	}
+
+	glog.Infof("[%s] Getting volume stats, volume id: %s, volume path: %s", ctx.Value(util.TraceIDKey), volumeID, volumePath)
+
+	exists, err := server.mounter.PathExists(ctx, volumePath)
+	if err != nil {
+		glog.Errorf("[%s] Failed to check whether volume path exists, err: %v", ctx.Value(util.TraceIDKey), err)
+		return nil, status.Errorf(codes.Internal, "[%s] failed to check whether volume path exists, err: %v", ctx.Value(util.TraceIDKey), err)
+	}
+
+	if !exists {
+		glog.Errorf("[%s] Volume path %s not exists", ctx.Value(util.TraceIDKey), volumePath)
+		return nil, status.Errorf(codes.NotFound, "[%s] volume path %s not exists", ctx.Value(util.TraceIDKey), volumePath)
+	}
+
+	isDevice, err := hostutil.NewHostUtil().PathIsDevice(volumePath)
+	if err != nil {
+		glog.Errorf("[%s] Failed to checkout whether volume is device, err: %v", ctx.Value(util.TraceIDKey), err)
+		return nil, status.Errorf(codes.Internal, "[%s] failed to checkout whether volume is device, err: %v", ctx.Value(util.TraceIDKey), err)
+	}
+
+	if isDevice {
+		size, err := server.getBlockDeviceSize(ctx, volumePath)
+		if err != nil {
+			glog.Errorf("[%s] Failed to get volume size, err: %v", ctx.Value(util.TraceIDKey), err)
+			return nil, status.Errorf(codes.Internal, "[%s] failed to get volume size, err: %v", ctx.Value(util.TraceIDKey), err)
+		}
+
+		return &csi.NodeGetVolumeStatsResponse{
+			Usage: []*csi.VolumeUsage{
+				{
+					Unit:  csi.VolumeUsage_BYTES,
+					Total: size,
+				},
+			},
+		}, nil
+	}
+
+	metrics, err := volume.NewMetricsStatFS(volumePath).GetMetrics()
+	if err != nil {
+		glog.Errorf("[%s] Failed to get volume metrics, err: %v", ctx.Value(util.TraceIDKey), err)
+		return nil, status.Errorf(codes.Internal, "[%s] failed to get volume metrics, err: %v", ctx.Value(util.TraceIDKey), err)
+	}
+
+	return &csi.NodeGetVolumeStatsResponse{
+		Usage: []*csi.VolumeUsage{
+			{
+				Unit:      csi.VolumeUsage_BYTES,
+				Available: metrics.Available.AsDec().UnscaledBig().Int64(),
+				Total:     metrics.Capacity.AsDec().UnscaledBig().Int64(),
+				Used:      metrics.Used.AsDec().UnscaledBig().Int64(),
+			},
+			{
+				Unit:      csi.VolumeUsage_INODES,
+				Available: metrics.InodesFree.AsDec().UnscaledBig().Int64(),
+				Total:     metrics.Inodes.AsDec().UnscaledBig().Int64(),
+				Used:      metrics.InodesUsed.AsDec().UnscaledBig().Int64(),
+			},
+		},
+	}, nil
+}
+
 func (server *nodeServer) nodePublicBlockVolume(ctx context.Context, req *csi.NodePublishVolumeRequest, mode *csi.VolumeCapability_Block) (*csi.NodePublishVolumeResponse, error) {
 	volumeID := req.GetVolumeId()
 	if volumeID == "" {
@@ -415,4 +491,21 @@ func (server *nodeServer) nodePublishMountVolume(ctx context.Context, req *csi.N
 		return nil, status.Errorf(codes.Internal, "[%s] failed to mount %s to %s, err: %v", ctx.Value(util.TraceIDKey), source, targetPath, err)
 	}
 	return &csi.NodePublishVolumeResponse{}, nil
+}
+
+func (server *nodeServer) getBlockDeviceSize(ctx context.Context, path string) (int64, error) {
+	cmd := server.mounter.Command("blockdev", "--getsize64", path)
+	output, err := cmd.Output()
+	if err != nil {
+		glog.Errorf("[%s] Failed to get size of volume, path: %s, output: %s, err: %v", ctx.Value(util.TraceIDKey), path, output, err)
+		return -1, err
+	}
+
+	trimSpaceOutput := strings.TrimSpace(string(output))
+	size, err := strconv.ParseInt(trimSpaceOutput, 10, 64)
+	if err != nil {
+		glog.Errorf("[%s] Failed to parse size %s as int, err: %v", ctx.Value(util.TraceIDKey), trimSpaceOutput, err)
+		return -1, err
+	}
+	return size, nil
 }

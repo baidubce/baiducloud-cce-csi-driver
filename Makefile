@@ -11,7 +11,7 @@ GOBUILD := $(GO) build
 GOTEST  := $(GO) test -gcflags="-N -l"
 GOPKGS  := $$($(GO) list ./...| grep -vE "vendor")
 GIT_COMMIT := $(shell git rev-parse HEAD)
-VERSION := v1.0.0
+VERSION := v1.1.0
 
 # test cover files
 COVPROF := $(HOMEDIR)/covprof.out  # coverage profile
