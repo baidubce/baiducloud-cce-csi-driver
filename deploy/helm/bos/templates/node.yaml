@@ -74,11 +74,18 @@ spec:
               mountPropagation: "Bidirectional"
             - name: host-sys
               mountPath: /sys
-              mountPropagation: "HostToContainer"
             - name: docker-sock
               mountPath: /var/run/docker.sock
             - name: bosfs-cred-dir
               mountPath: /etc/bosfs/credentials
+      {{- with .Values.nodeServerAffinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeServerTolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: kubelet-dir
           hostPath:

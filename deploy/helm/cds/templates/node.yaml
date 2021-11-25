@@ -77,10 +77,16 @@ spec:
               mountPropagation: "Bidirectional"
             - name: host-dev
               mountPath: /dev
-              mountPropagation: "HostToContainer"
             - name: host-sys
               mountPath: /sys
-              mountPropagation: "HostToContainer"
+      {{- with .Values.nodeServerAffinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeServerTolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: kubelet-dir
           hostPath:

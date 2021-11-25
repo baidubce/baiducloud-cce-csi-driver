@@ -13,18 +13,6 @@ spec:
       labels:
         app: csi-cdsplugin-controller-server
     spec:
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 1
-              podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                    - key: app
-                      operator: In
-                      values:
-                        - csi-cdsplugin-controller-server
-                topologyKey: "kubernetes.io/hostname"
       priorityClassName: system-node-critical
       serviceAccount: csi-cds-external-runner
       hostNetwork: true
@@ -123,6 +111,14 @@ spec:
             requests:
               cpu: 100m
               memory: 100Mi
+      {{- with .Values.controllerServerAffinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controllerServerTolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: plugin-dir
           emptyDir: {}
