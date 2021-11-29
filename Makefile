@@ -11,7 +11,7 @@ GOBUILD := $(GO) build
 GOTEST  := $(GO) test -gcflags="-N -l"
 GOPKGS  := $$($(GO) list ./...| grep -vE "vendor")
 GIT_COMMIT := $(shell git rev-parse HEAD)
-VERSION := v1.1.0
+VERSION := v1.1.1
 
 # test cover files
 COVPROF := $(HOMEDIR)/covprof.out  # coverage profile
@@ -30,22 +30,19 @@ set-env:
 	$(GO) env -w GONOPROXY=\*\*.baidu.com\*\*
 	$(GO) env -w GOPROXY=https://goproxy.io
 	$(GO) env -w GONOSUMDB=\*
-	$(GO) env -w CGO_ENABLED=0
-	$(GO) env -w GOOS=linux
-	$(GO) env -w GOARCH=amd64
 
 
 #make prepare, download dependencies
 prepare: gomod
 
 gomod: set-env
-	$(GOMOD) download
+	$(GOMOD) tidy
 
 #make compile
 compile: build
 
 build:
-	$(GOBUILD) -ldflags "-X main.DriverVersion=$(VERSION) -X main.DriverGitCommit=$(GIT_COMMIT)" -o $(HOMEDIR)/csi-plugin $(HOMEDIR)/cmd/
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -ldflags "-X main.DriverVersion=$(VERSION) -X main.DriverGitCommit=$(GIT_COMMIT)" -o $(HOMEDIR)/csi-plugin $(HOMEDIR)/cmd/
 
 # make test, test your code
 test: prepare test-case

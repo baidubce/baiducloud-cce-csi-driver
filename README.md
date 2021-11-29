@@ -89,7 +89,7 @@ To build the project, first turn on go mod using `export GO111MODULE=on`, then b
 
 ## Authors
 
-* Maintainers: pansiyuan02@baidu.com, yezichao@baidu.com
+* Maintainers: yezichao@baidu.com
 
 ## Discussion
 

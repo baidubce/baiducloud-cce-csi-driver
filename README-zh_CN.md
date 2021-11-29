@@ -98,7 +98,7 @@ make image-all
 
 ### 维护者
 
-* 主要维护者：: pansiyuan02@baidu.com, yezichao@baidu.com
+* 主要维护者：: yezichao@baidu.com
 
 ### 讨论
 

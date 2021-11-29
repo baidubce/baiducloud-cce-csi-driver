@@ -16,6 +16,7 @@
 package cloud
 
 import (
+	"errors"
 	"io/ioutil"
 	"net/http"
 )
@@ -23,6 +24,11 @@ import (
 const (
 	bccMetaDataInstanceShortIDEndpoint = "http://169.254.169.254/2009-04-04/meta-data/instance-shortid"
 	bccMetaDataAZoneEndpoint           = "http://169.254.169.254/2009-04-04/meta-data/azone"
+)
+
+var (
+	ErrEmptyInstanceID = errors.New("meta service returns empty instanceID")
+	ErrEmptyZone       = errors.New("meta service returns empty zone")
 )
 
 //go:generate mockgen -destination=./mock/mock_metadata.go -package=mock github.com/baidubce/baiducloud-cce-csi-driver/pkg/cloud MetaDataService
@@ -66,6 +72,9 @@ func NewMetaDataService() (MetaDataService, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(instanceID) == 0 {
+		return nil, ErrEmptyInstanceID
+	}
 	metaData.instanceID = string(instanceID)
 
 	zoneResp, err := http.DefaultClient.Get(bccMetaDataAZoneEndpoint)
@@ -77,6 +86,9 @@ func NewMetaDataService() (MetaDataService, error) {
 	zone, err := ioutil.ReadAll(zoneResp.Body)
 	if err != nil {
 		return nil, err
+	}
+	if len(zone) == 0 {
+		return nil, ErrEmptyZone
 	}
 	metaData.zone = string(zone)
 

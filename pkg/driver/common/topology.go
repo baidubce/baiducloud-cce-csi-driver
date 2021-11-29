@@ -124,6 +124,10 @@ func getNodeTopologyFromK8SNode(ctx context.Context) (string, string, error) {
 		return "", "", fmt.Errorf("zone is not set in node labels")
 	}
 
+	if nodeID == "" || zone == "" {
+		return "", "", fmt.Errorf(`nodeID or zone is empty: nodeID="%s", zone="%s"`, nodeID, zone)
+	}
+
 	return nodeID, zone, nil
 }
 

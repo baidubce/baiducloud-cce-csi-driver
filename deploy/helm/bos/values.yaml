@@ -4,7 +4,7 @@
 
 image:
   registrar: registry.baidubce.com/cce-plugin-pro/csi-node-driver-registrar:v2.1.0
-  plugin: registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:v1.1.0
+  plugin: registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:v1.1.1
   bosfs: registry.baidubce.com/cce-plugin-pro/bosfs:1.0.0.10
 
 endpoint:
@@ -15,8 +15,9 @@ region:
 topologyMode: meta
 maxVolumesPerNode: 10
 logLevel: 5
-kubeletDataDirPath: /home/cce/kubelet
+kubeletDataDirPath: /var/lib/kubelet
 dockerSocketPath: /var/run/docker.sock
 
-nodeServerTolerations: []
+nodeServerTolerations:
+- operator: Exists # node server tolerates all taints by default.
 nodeServerAffinity: {}

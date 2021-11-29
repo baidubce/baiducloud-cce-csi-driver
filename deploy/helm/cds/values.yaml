@@ -7,7 +7,7 @@ image:
   attacher: registry.baidubce.com/cce-plugin-pro/csi-attacher:v2.2.1
   resizer: registry.baidubce.com/cce-plugin-pro/csi-resizer:v1.2.0
   registrar: registry.baidubce.com/cce-plugin-pro/csi-node-driver-registrar:v2.1.0
-  plugin: registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:v1.1.0
+  plugin: registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:v1.1.1
 
 endpoint:
   bcc: bcc.gz.baidubce.com
@@ -18,13 +18,14 @@ endpoint:
 driverName: cds.csi.baidubce.com
 clusterID:
 region:
-topologyMode: meta
+topologyMode: auto
 authMode: key
 maxVolumesPerNode: 10
 logLevel: 5
-kubeletDataDirPath: /home/cce/kubelet
+kubeletDataDirPath: /var/lib/kubelet
 
-nodeServerTolerations: []
+nodeServerTolerations:
+- operator: Exists # node server tolerates all taints by default.
 nodeServerAffinity:
   nodeAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
@@ -34,21 +35,15 @@ nodeServerAffinity:
               operator: NotIn
               values:
                 - BBC
-            - key: beta.kubernetes.io/instance-gpu
-              operator: NotIn
-              values:
-                - "true"
 
 controllerServerTolerations: []
 controllerServerAffinity:
   podAntiAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 1
-        podAffinityTerm:
-          labelSelector:
-            matchExpressions:
-              - key: app
-                operator: In
-                values:
-                  - csi-cdsplugin-controller-server
-          topologyKey: "kubernetes.io/hostname"
+    requiredDuringSchedulingIgnoredDuringExecution:
+    - topologyKey: "kubernetes.io/hostname"
+      labelSelector:
+        matchExpressions:
+        - key: app
+          operator: In
+          values:
+          - csi-cdsplugin-controller-server
