@@ -16,6 +16,8 @@ spec:
       hostNetwork: true
       restartPolicy: Always
       priorityClassName: system-node-critical
+      tolerations:
+      - operator: Exists
       containers:
         - name: node-driver-registrar
           image: registry.baidubce.com/cce-plugin-pro/csi-node-driver-registrar:v2.1.0
@@ -25,20 +27,20 @@ spec:
             - "--v=5"
           env:
             - name: ADDRESS
-              value: /home/cce/kubelet/plugins/cds.csi.baidubce.com/csi.sock
+              value: /var/lib/kubelet/plugins/cds.csi.baidubce.com/csi.sock
           imagePullPolicy: "Always"
           volumeMounts:
             - name: reg-dir
               mountPath: /registration
             - name: kubelet-dir
-              mountPath: /home/cce/kubelet
+              mountPath: /var/lib/kubelet
         - name: csi-cdsplugin
           securityContext:
             privileged: true
             capabilities:
               add: ["SYS_ADMIN"]
             allowPrivilegeEscalation: true
-          image: registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:v1.0.0
+          image: registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:v1.1.1
           args :
             - "--driver-type=cds"
             - "--csi-endpoint=$(CSI_ENDPOINT)"
@@ -49,7 +51,7 @@ spec:
             - "--v=5"
           env:
             - name: CSI_ENDPOINT
-              value: unix://home/cce/kubelet/plugins/cds.csi.baidubce.com/csi.sock
+              value: unix://var/lib/kubelet/plugins/cds.csi.baidubce.com/csi.sock
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
@@ -57,7 +59,7 @@ spec:
           imagePullPolicy: "Always"
           volumeMounts:
             - name: kubelet-dir
-              mountPath: /home/cce/kubelet
+              mountPath: /var/lib/kubelet
               mountPropagation: "Bidirectional"
             - name: host-dev
               mountPath: /dev
@@ -68,11 +70,11 @@ spec:
       volumes:
         - name: kubelet-dir
           hostPath:
-            path: /home/cce/kubelet
+            path: /var/lib/kubelet
             type: DirectoryOrCreate
         - name: reg-dir
           hostPath:
-            path: /home/cce/kubelet/plugins_registry
+            path: /var/lib/kubelet/plugins_registry
             type: DirectoryOrCreate
         - name: host-dev
           hostPath:

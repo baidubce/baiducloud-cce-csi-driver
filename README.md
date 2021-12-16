@@ -47,6 +47,15 @@ A health CCE kubernetes cluster. See [documents for creating a CCE cluster](http
 ### Installing
 
 #### Install CSI CDSPlugin
+
+Helm
+
+```
+helm upgrade --install csi-cdsplugin ./deploy/helm/cds -f ./deploy/helm/cds/values.yaml
+```
+
+Kubectl
+
 ```
 kubectl apply -f ./deploy/kubernetes/cds/rbac.yaml
 kubectl apply -f ./deploy/kubernetes/cds/controller.yaml
@@ -54,6 +63,15 @@ kubectl apply -f ./deploy/kubernetes/cds/node.yaml
 ```
 
 #### Install CSI BOSPlugin
+
+Helm
+
+```
+helm upgrade --install csi-bosplugin ./deploy/helm/bos -f ./deploy/helm/bos/values.yaml
+```
+
+Kubectl
+
 ```
 kubectl apply -f ./deploy/kubernetes/bos/rbac.yaml
 kubectl apply -f ./deploy/kubernetes/bos/node.yaml

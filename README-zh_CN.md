@@ -47,6 +47,14 @@
 
 #### 部署 CDS Driver
 
+Helm
+
+```
+helm upgrade --install csi-cdsplugin ./deploy/helm/cds -f ./deploy/helm/cds/values.yaml
+```
+
+Kubectl
+
 ```
 kubectl apply -f ./deploy/kubernetes/cds/rbac.yaml
 kubectl apply -f ./deploy/kubernetes/cds/controller.yaml
@@ -54,6 +62,14 @@ kubectl apply -f ./deploy/kubernetes/cds/node.yaml
 ```
 
 #### 部署 BOS Driver
+
+Helm
+
+```
+helm upgrade --install csi-bosplugin ./deploy/helm/bos -f ./deploy/helm/bos/values.yaml
+```
+
+Kubectl
 
 ```
 kubectl apply -f ./deploy/kubernetes/bos/rbac.yaml
