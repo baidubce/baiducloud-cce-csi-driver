@@ -4,7 +4,7 @@
 
 image:
   provisioner: registry.baidubce.com/cce-plugin-pro/csi-provisioner:v1.6.1
-  attacher: registry.baidubce.com/cce-plugin-pro/csi-attacher:v2.2.1
+  attacher: registry.baidubce.com/cce-plugin-pro/csi-attacher:v2.2.1-cce
   resizer: registry.baidubce.com/cce-plugin-pro/csi-resizer:v1.2.0
   registrar: registry.baidubce.com/cce-plugin-pro/csi-node-driver-registrar:v2.1.0
   plugin: registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:v1.1.1

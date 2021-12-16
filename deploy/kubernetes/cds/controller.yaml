@@ -61,7 +61,7 @@ spec:
             - name: plugin-dir
               mountPath: /home/cce/kubelet/plugins/cds.csi.baidubce.com
         - name: csi-attacher
-          image: registry.baidubce.com/cce-plugin-pro/csi-attacher:v2.2.1
+          image: registry.baidubce.com/cce-plugin-pro/csi-attacher:v2.2.1-cce
           args:
             - "--csi-address=$(ADDRESS)"
             - "--leader-election=true"
