@@ -17,8 +17,11 @@ package cloud
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 
+	"github.com/baidubce/bce-sdk-go/bce"
 	"github.com/baidubce/bce-sdk-go/services/bos"
 )
 
@@ -51,5 +54,16 @@ func NewBOSService(endpoint string) (BOSService, error) {
 
 func (service *bosService) BucketExists(ctx context.Context, bucketName string, auth Auth) (bool, error) {
 	client := service.client(ctx, auth)
-	return client.DoesBucketExist(bucketName)
+	// NOTE: client.DoesBucketExist is not suitable here since it returns [true, nil] while 403 happens.
+	err := client.HeadBucket(bucketName)
+	if err == nil {
+		return true, nil
+	}
+	var bceErr *bce.BceServiceError
+	if errors.As(err, &bceErr) {
+		if bceErr.StatusCode == http.StatusNotFound {
+			return false, nil
+		}
+	}
+	return false, err
 }

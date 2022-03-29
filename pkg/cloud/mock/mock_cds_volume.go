@@ -148,6 +148,20 @@ func (mr *MockCDSVolumeMockRecorder) IsAvailable() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsAvailable", reflect.TypeOf((*MockCDSVolume)(nil).IsAvailable))
 }
 
+// IsCreating mocks base method
+func (m *MockCDSVolume) IsCreating() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsCreating")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsCreating indicates an expected call of IsCreating
+func (mr *MockCDSVolumeMockRecorder) IsCreating() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsCreating", reflect.TypeOf((*MockCDSVolume)(nil).IsCreating))
+}
+
 // IsDetaching mocks base method
 func (m *MockCDSVolume) IsDetaching() bool {
 	m.ctrl.T.Helper()

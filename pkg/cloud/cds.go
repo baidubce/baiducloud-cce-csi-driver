@@ -55,6 +55,7 @@ type CDSVolume interface {
 	IsAttached() bool
 	IsAttaching() bool
 	IsDetaching() bool
+	IsCreating() bool
 }
 
 type CreateCDSVolumeArgs struct {
@@ -273,6 +274,10 @@ func (v *cdsVolume) IsInUse() bool {
 
 func (v *cdsVolume) IsScaling() bool {
 	return v.Status == bccapi.VolumeStatusSCALING
+}
+
+func (v *cdsVolume) IsCreating() bool {
+	return v.Status == bccapi.VolumeStatusCREATING
 }
 
 func (v *cdsVolume) IsAvailable() bool {

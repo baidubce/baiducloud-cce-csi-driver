@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/baidubce/baiducloud-cce-csi-driver/pkg/cloud"
 	cloudmock "github.com/baidubce/baiducloud-cce-csi-driver/pkg/cloud/mock"
@@ -74,10 +75,14 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 			Preferred: nil,
 		},
 	}
+	// ctx3s disables the retry loop.
+	ctx3s, cancel := context.WithTimeout(context.TODO(), time.Second*3)
+	defer cancel()
 
 	testCases := []struct {
 		name         string
 		mocks        mocks
+		ctx          context.Context
 		req          *csi.CreateVolumeRequest
 		expectedResp *csi.CreateVolumeResponse
 		expectedErr  bool
@@ -95,6 +100,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -111,6 +117,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx: ctx3s,
 			req: &csi.CreateVolumeRequest{
 				Name: "pv-xxxx",
 				CapacityRange: &csi.CapacityRange{
@@ -166,6 +173,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -189,6 +197,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -200,6 +209,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
 				cdsVolume.EXPECT().Detail().Return(nil)
 				cdsVolume.EXPECT().SizeGB().Return(1)
+				cdsVolume.EXPECT().IsCreating().Return(false)
 				cdsVolume.EXPECT().ID().Return("v-xxxx")
 				cdsVolume.EXPECT().Zone().Return("zoneA")
 				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
@@ -217,6 +227,78 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx: ctx3s,
+			req: &normalReq,
+			expectedResp: &csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					CapacityBytes: 1 * util.GB,
+					VolumeId:      "v-xxxx",
+					AccessibleTopology: []*csi.Topology{
+						{
+							Segments: map[string]string{
+								corev1.LabelFailureDomainBetaZone: "zoneA",
+							},
+						},
+					},
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "volume is on creating",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
+				cdsVolume.EXPECT().Detail().Return(nil)
+				cdsVolume.EXPECT().SizeGB().Return(1)
+				cdsVolume.EXPECT().IsCreating().Return(true)
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
+				volumeService.EXPECT().GetVolumeByName(gomock.Any(), gomock.Eq("pv-xxxx"), gomock.Any()).Return(cdsVolume, nil)
+				server := &controllerServer{
+					UnimplementedControllerServer: csi.UnimplementedControllerServer{},
+					volumeService:                 volumeService,
+					getAuth:                       common.GetAuthModeAccessKey,
+					creatingVolumeCache:           &sync.Map{},
+					inProcessRequests:             util.NewKeyMutex(),
+				}
+
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			ctx:          ctx3s,
+			req:          &normalReq,
+			expectedResp: nil,
+			expectedErr:  true,
+		},
+		{
+			name: "volume becomes created after one time creating",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
+				cdsVolume.EXPECT().Detail().Return(nil).Times(2)
+				cdsVolume.EXPECT().SizeGB().Return(1).Times(2)
+				cdsVolume.EXPECT().IsCreating().Return(true)
+				cdsVolume.EXPECT().IsCreating().Return(false)
+				cdsVolume.EXPECT().ID().Return("v-xxxx")
+				cdsVolume.EXPECT().Zone().Return("zoneA")
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
+				volumeService.EXPECT().GetVolumeByName(gomock.Any(), gomock.Eq("pv-xxxx"), gomock.Any()).Return(cdsVolume, nil).Times(2)
+				server := &controllerServer{
+					UnimplementedControllerServer: csi.UnimplementedControllerServer{},
+					volumeService:                 volumeService,
+					getAuth:                       common.GetAuthModeAccessKey,
+					creatingVolumeCache:           &sync.Map{},
+					inProcessRequests:             util.NewKeyMutex(),
+				}
+
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			ctx: context.TODO(),
 			req: &normalReq,
 			expectedResp: &csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
@@ -272,6 +354,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -315,6 +398,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -358,6 +442,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -388,6 +473,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
 				cdsVolume.EXPECT().Detail().Return(nil)
 				cdsVolume.EXPECT().SizeGB().Return(1)
+				cdsVolume.EXPECT().IsCreating().Return(false)
 				cdsVolume.EXPECT().ID().Return("v-xxxx")
 				cdsVolume.EXPECT().Zone().Return("zoneA")
 				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil)
@@ -406,6 +492,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx: ctx3s,
 			req: &normalReq,
 			expectedResp: &csi.CreateVolumeResponse{
 				Volume: &csi.Volume{
@@ -427,7 +514,7 @@ func TestControllerServer_CreateVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			defer tc.mocks.ctrl.Finish()
-			resp, err := tc.mocks.server.CreateVolume(context.Background(), tc.req)
+			resp, err := tc.mocks.server.CreateVolume(tc.ctx, tc.req)
 			if (err != nil && !tc.expectedErr) || (err == nil && tc.expectedErr) {
 				t.Errorf("expected err: %v, actual: %v", tc.expectedErr, err)
 				return
@@ -602,10 +689,14 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 			common.SecretKey: "test-sk",
 		},
 	}
+	// ctx3s disables the retry loop.
+	ctx3s, cancel := context.WithTimeout(context.TODO(), 3*time.Second)
+	defer cancel()
 
 	testCases := []struct {
 		name         string
 		mocks        mocks
+		ctx          context.Context
 		req          *csi.ControllerPublishVolumeRequest
 		expectedResp *csi.ControllerPublishVolumeResponse
 		expectedErr  bool
@@ -620,6 +711,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx: ctx3s,
 			req: &csi.ControllerPublishVolumeRequest{
 				VolumeId: "v-xxxx",
 				NodeId:   "i-xxxx",
@@ -648,6 +740,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -664,6 +757,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -682,6 +776,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -700,9 +795,50 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
+		},
+		{
+			name: "volume is attached to the node after one time attaching",
+			mocks: func() mocks {
+				ctrl := gomock.NewController(t)
+				nodeService := cloudmock.NewMockNodeService(ctrl)
+				nodeService.EXPECT().GetNodeByID(gomock.Any(), "i-xxxx", gomock.Any()).Return(nil, nil).Times(2)
+				cdsVolume := cloudmock.NewMockCDSVolume(ctrl)
+				cdsVolume.EXPECT().IsAttached().Return(false)
+				cdsVolume.EXPECT().IsAttaching().Return(true)
+				cdsVolume.EXPECT().IsAttached().Return(true)
+				cdsVolume.EXPECT().Detail().Return(&bccapi.VolumeModel{
+					Id:     "v-xxxx",
+					Status: bccapi.VolumeStatusINUSE,
+					Attachments: []bccapi.VolumeAttachmentModel{
+						{
+							VolumeId:   "v-xxxx",
+							InstanceId: "i-xxxx",
+							Device:     "/dev/vdc",
+							Serial:     "v-xxxx",
+						},
+					},
+				}).AnyTimes()
+				volumeService := cloudmock.NewMockCDSVolumeService(ctrl)
+				volumeService.EXPECT().GetVolumeByID(gomock.Any(), "v-xxxx", gomock.Any()).Return(cdsVolume, nil).Times(2)
+				server := newControllerServer(volumeService, nodeService, &common.DriverOptions{})
+				return mocks{
+					ctrl:   ctrl,
+					server: server,
+				}
+			}(),
+			ctx: context.TODO(),
+			req: &normalReq,
+			expectedResp: &csi.ControllerPublishVolumeResponse{
+				PublishContext: map[string]string{
+					DevNameKey: "/dev/vdc",
+					SerialKey:  "v-xxxx",
+				},
+			},
+			expectedErr: false,
 		},
 		{
 			name: "volume is already attached to the node",
@@ -732,6 +868,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx: ctx3s,
 			req: &normalReq,
 			expectedResp: &csi.ControllerPublishVolumeResponse{
 				PublishContext: map[string]string{
@@ -769,6 +906,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -790,6 +928,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -814,6 +953,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -838,6 +978,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -847,7 +988,7 @@ func TestControllerServer_ControllerPublishVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			defer tc.mocks.ctrl.Finish()
-			resp, err := tc.mocks.server.ControllerPublishVolume(context.Background(), tc.req)
+			resp, err := tc.mocks.server.ControllerPublishVolume(tc.ctx, tc.req)
 			if (err != nil && !tc.expectedErr) || (err == nil && tc.expectedErr) {
 				t.Errorf("expected err: %v, actual: %v", tc.expectedErr, err)
 				return
@@ -874,9 +1015,14 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 		},
 	}
 
+	// ctx3s disables the retry loop.
+	ctx3s, cancel := context.WithTimeout(context.TODO(), 3*time.Second)
+	defer cancel()
+
 	testCases := []struct {
 		name         string
 		mocks        mocks
+		ctx          context.Context
 		req          *csi.ControllerUnpublishVolumeRequest
 		expectedResp *csi.ControllerUnpublishVolumeResponse
 		expectedErr  bool
@@ -894,6 +1040,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: &csi.ControllerUnpublishVolumeResponse{},
 			expectedErr:  false,
@@ -911,6 +1058,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -929,6 +1077,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: &csi.ControllerUnpublishVolumeResponse{},
 			expectedErr:  false,
@@ -947,6 +1096,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -971,6 +1121,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: &csi.ControllerUnpublishVolumeResponse{},
 			expectedErr:  false,
@@ -1003,6 +1154,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -1036,6 +1188,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -1069,6 +1222,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 					server: server,
 				}
 			}(),
+			ctx:          ctx3s,
 			req:          &normalReq,
 			expectedResp: nil,
 			expectedErr:  true,
@@ -1078,7 +1232,7 @@ func TestControllerServer_ControllerUnpublishVolume(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			defer tc.mocks.ctrl.Finish()
-			resp, err := tc.mocks.server.ControllerUnpublishVolume(context.Background(), tc.req)
+			resp, err := tc.mocks.server.ControllerUnpublishVolume(tc.ctx, tc.req)
 			if (err != nil && !tc.expectedErr) || (err == nil && tc.expectedErr) {
 				t.Errorf("expected err: %v, actual: %v", tc.expectedErr, err)
 				return

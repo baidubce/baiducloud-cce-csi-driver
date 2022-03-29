@@ -45,36 +45,20 @@
 
 ### 部署
 
-#### 部署 CDS Driver
+需要使用[Helm](https://helm.sh)部署。
 
-Helm
+部署前请先阅读`values.yaml`文件内容，部署时可能需要按需修改部分字段。
+
+#### 部署 CDS Driver
 
 ```
 helm upgrade --install csi-cdsplugin ./deploy/helm/cds -f ./deploy/helm/cds/values.yaml
 ```
 
-Kubectl
-
-```
-kubectl apply -f ./deploy/kubernetes/cds/rbac.yaml
-kubectl apply -f ./deploy/kubernetes/cds/controller.yaml
-kubectl apply -f ./deploy/kubernetes/cds/node.yaml
-```
-
 #### 部署 BOS Driver
-
-Helm
 
 ```
 helm upgrade --install csi-bosplugin ./deploy/helm/bos -f ./deploy/helm/bos/values.yaml
-```
-
-Kubectl
-
-```
-kubectl apply -f ./deploy/kubernetes/bos/rbac.yaml
-kubectl apply -f ./deploy/kubernetes/bos/node.yaml
-kubectl apply -f ./deploy/kubernetes/bos/csidriver.yaml
 ```
 
 ## 测试
@@ -91,7 +75,7 @@ make test
 
 ### 环境
 
-* Golang 1.13.+
+* Golang 1.18.+
 * Docker 17.05+ 用于镜像发布
 
 ### 依赖管理

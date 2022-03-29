@@ -2,13 +2,20 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# cce cluster id (with cce-/c- prefix).
+clusterID:
+# baidubce region (bj, gz, su, hkg, bd, fwh, etc).
+region:
+
+# images of components.
 image:
   provisioner: registry.baidubce.com/cce-plugin-pro/csi-provisioner:v1.6.1
   attacher: registry.baidubce.com/cce-plugin-pro/csi-attacher:v2.2.1-cce
   resizer: registry.baidubce.com/cce-plugin-pro/csi-resizer:v1.2.0
   registrar: registry.baidubce.com/cce-plugin-pro/csi-node-driver-registrar:v2.1.0
-  plugin: registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:v1.1.1
+  plugin: registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:v1.2.0
 
+# api endpoints of dependencies.
 endpoint:
   bcc: bcc.gz.baidubce.com
   cds: bcc.gz.baidubce.com
@@ -16,8 +23,6 @@ endpoint:
 
 
 driverName: cds.csi.baidubce.com
-clusterID:
-region:
 topologyMode: auto
 authMode: key
 maxVolumesPerNode: 10

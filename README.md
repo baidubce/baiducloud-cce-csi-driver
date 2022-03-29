@@ -46,36 +46,20 @@ A health CCE kubernetes cluster. See [documents for creating a CCE cluster](http
 
 ### Installing
 
-#### Install CSI CDSPlugin
+Prerequisite: [Helm](https://helm.sh)
 
-Helm
+Please read the values.yaml before installation and modify it when needed.
+
+#### Install CSI CDSPlugin
 
 ```
 helm upgrade --install csi-cdsplugin ./deploy/helm/cds -f ./deploy/helm/cds/values.yaml
 ```
 
-Kubectl
-
-```
-kubectl apply -f ./deploy/kubernetes/cds/rbac.yaml
-kubectl apply -f ./deploy/kubernetes/cds/controller.yaml
-kubectl apply -f ./deploy/kubernetes/cds/node.yaml
-```
-
 #### Install CSI BOSPlugin
-
-Helm
 
 ```
 helm upgrade --install csi-bosplugin ./deploy/helm/bos -f ./deploy/helm/bos/values.yaml
-```
-
-Kubectl
-
-```
-kubectl apply -f ./deploy/kubernetes/bos/rbac.yaml
-kubectl apply -f ./deploy/kubernetes/bos/node.yaml
-kubectl apply -f ./deploy/kubernetes/bos/csidriver.yaml
 ```
 
 ## Running the tests
@@ -91,7 +75,7 @@ make test
 Please go through [CSI Spec](https://github.com/container-storage-interface/spec/blob/master/spec.md) and [General CSI driver development guideline](https://kubernetes-csi.github.io/docs/developing.html) to get some basic understanding of CSI driver before you start.
 
 ### Requirements
-* Golang 1.13.+
+* Golang 1.18.+
 * Docker 17.05+ for releasing
 
 ### Dependency

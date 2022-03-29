@@ -4,14 +4,20 @@ OUTDIR  := $(HOMEDIR)/output
 
 # init command params
 GO      := go
-GOROOT  := $(GO_1_14_1_HOME)
+GOPROXY := https://goproxy.io,direct
+ifdef GO_1_18_BIN
+	GO      := $(GO_1_18_BIN)/go
+	GOPROXY := https://goproxy.baidu-int.com
+endif
+GOROOT  := $(GO_1_18_HOME)
 GOPATH  := $(shell $(GO) env GOPATH)
 GOMOD   := $(GO) mod
 GOBUILD := $(GO) build
 GOTEST  := $(GO) test -gcflags="-N -l"
 GOPKGS  := $$($(GO) list ./...| grep -vE "vendor")
-GIT_COMMIT := $(shell git rev-parse HEAD)
-VERSION := v1.1.1
+GIT_COMMIT := $(shell git describe --tags --always --dirty="-dev")
+VERSION := v1.2.0
+
 
 # test cover files
 COVPROF := $(HOMEDIR)/covprof.out  # coverage profile
@@ -28,7 +34,7 @@ image-all: all build-csi-plugin-image
 set-env:
 	$(GO) env -w GO111MODULE=on
 	$(GO) env -w GONOPROXY=\*\*.baidu.com\*\*
-	$(GO) env -w GOPROXY=https://goproxy.io
+	$(GO) env -w GOPROXY=$(GOPROXY)
 	$(GO) env -w GONOSUMDB=\*
 
 
@@ -57,7 +63,7 @@ package-bin:
 
 
 build-csi-plugin-image:
-	docker build -t registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:$(VERSION) -f build/Dockerfile .
+	docker build --platform linux/amd64 -t registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:$(VERSION) -f build/Dockerfile .
 
 push-image:
 	docker push registry.baidubce.com/cce-plugin-pro/cce-csi-plugin:$(VERSION)

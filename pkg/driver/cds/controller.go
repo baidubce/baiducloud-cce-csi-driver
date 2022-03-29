@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/glog"
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	corev1 "k8s.io/api/core/v1"
@@ -51,6 +53,13 @@ var (
 		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
 		csi.ControllerServiceCapability_RPC_EXPAND_VOLUME,
 	}
+
+	// createVolumeGroup implements idempotency with volumeName.
+	createVolumeGroup singleflight.Group
+	// controllerPublishVolumeGroup implements idempotency with volumeID.
+	controllerPublishVolumeGroup singleflight.Group
+	// controllerUnpublishVolumeGroup implements idempotency with volumeID.
+	controllerUnpublishVolumeGroup singleflight.Group
 )
 
 type controllerServer struct {
@@ -108,7 +117,59 @@ func (server *controllerServer) ControllerGetCapabilities(ctx context.Context, r
 	}, nil
 }
 
+// retryOnAborted triggers retry on status Aborted with context awared.
+func retryOnAborted[Req any, Resp any](ctx context.Context, name string, req Req, group *singleflight.Group, key string, f func(context.Context, Req) (Resp, error)) (interface{}, error, bool) {
+	return group.Do(key, func() (resp interface{}, err error) {
+		var cancel context.CancelFunc
+		deadline, ok := ctx.Deadline()
+		if !ok {
+			ctx, cancel = context.WithTimeout(ctx, time.Minute)
+			defer cancel()
+			deadline, _ = ctx.Deadline()
+		}
+
+		// Retry should be interrupted a little earlier before the overall context deadline,
+		// or the http request in flight may be canceled, which would mess up the real error.
+		waitDeadline := deadline.Add(-3 * time.Second)
+		glog.V(4).Infof("[%s] %s will wait until %s", ctx.Value(util.TraceIDKey), name, waitDeadline.Format(time.RFC3339Nano))
+		waitCtx, waitCancel := context.WithDeadline(context.TODO(), waitDeadline)
+		defer waitCancel()
+
+		// Retry loop with deadline.
+	RetryLoop:
+		for {
+			resp, err = f(ctx, req)
+			if status.Code(err) != codes.Aborted {
+				// Do not retry on codes other than aborted.
+				break RetryLoop
+			}
+			glog.Warningf("[%s] Request of %s %s is aborted, may retry in 2s: %v",
+				ctx.Value(util.TraceIDKey), name, key, err)
+			select {
+			case <-waitCtx.Done():
+				glog.Warningf("retry context has exceeded: %v", waitCtx.Err())
+				break RetryLoop
+			case <-time.After(2 * time.Second):
+			}
+		}
+		return resp, err
+	})
+}
+
 func (server *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+	volumeName := req.GetName()
+	if volumeName == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "[%s] empty volume name", ctx.Value(util.TraceIDKey))
+	}
+	// createVolumeGroup implements idempotency with volumeName.
+	result, err, shared := retryOnAborted(ctx, "CreateVolume", req, &createVolumeGroup, volumeName, server.createVolume)
+	glog.V(4).Infof("[%s] Request of CreateVolume %s returns with shared=%v err=%v",
+		ctx.Value(util.TraceIDKey), volumeName, shared, err)
+	resp := result.(*csi.CreateVolumeResponse)
+	return resp, err
+}
+
+func (server *controllerServer) createVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	// 1. Parse and check request arguments.
 	volumeName := req.GetName()
 	if volumeName == "" {
@@ -206,8 +267,13 @@ func (server *controllerServer) CreateVolume(ctx context.Context, req *csi.Creat
 		// Volume exists
 		sizeGB := volume.SizeGB()
 		if sizeGB != volumeSizeGB {
-			glog.Errorf("[%s] Volume already exists, but has a different size, volume size: %d GB", ctx.Value(util.TraceIDKey), volume.SizeGB())
+			glog.Errorf("[%s] Volume %s already exists, but has a different size, volume size: %d GB", ctx.Value(util.TraceIDKey), volumeName, volume.SizeGB())
 			return nil, status.Errorf(codes.AlreadyExists, "[%s] volume is already exist, but has a different size", ctx.Value(util.TraceIDKey))
+		}
+
+		if volume.IsCreating() {
+			glog.Errorf("[%s] Volume %s is creating, retry later", ctx.Value(util.TraceIDKey), volumeName)
+			return nil, status.Errorf(codes.Aborted, "[%s] volume is creating, retry later", ctx.Value(util.TraceIDKey))
 		}
 
 		return &csi.CreateVolumeResponse{
@@ -278,6 +344,11 @@ func (server *controllerServer) CreateVolume(ctx context.Context, req *csi.Creat
 	glog.V(4).Infof("[%s] Fetch volume from cloud after creating, name: %s, id: %s, volume detail: %s",
 		ctx.Value(util.TraceIDKey), volumeName, id, util.ToJSONOrPanic(volume.Detail()))
 
+	if volume.IsCreating() {
+		glog.Errorf("[%s] Volume %s is creating, retry later", ctx.Value(util.TraceIDKey), volumeName)
+		return nil, status.Errorf(codes.Aborted, "[%s] volume is creating, retry later", ctx.Value(util.TraceIDKey))
+	}
+
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			CapacityBytes: int64(volume.SizeGB()) * util.GB,
@@ -325,6 +396,19 @@ func (server *controllerServer) DeleteVolume(ctx context.Context, req *csi.Delet
 }
 
 func (server *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+	volumeID := req.GetVolumeId()
+	if volumeID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "[%s] empty volume id", ctx.Value(util.TraceIDKey))
+	}
+	// controllerPublishVolumeGroup implements idempotency with volumeID.
+	result, err, shared := retryOnAborted(ctx, "ControllerPublishVolume", req, &controllerPublishVolumeGroup, volumeID, server.controllerPublishVolume)
+	glog.V(4).Infof("[%s] Request of ControllerPublishVolume %s returns with shared=%v err=%v",
+		ctx.Value(util.TraceIDKey), volumeID, shared, err)
+	resp := result.(*csi.ControllerPublishVolumeResponse)
+	return resp, err
+}
+
+func (server *controllerServer) controllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 	// 1. Parse request args.
 	volumeID := req.GetVolumeId()
 	if volumeID == "" {
@@ -404,6 +488,19 @@ func (server *controllerServer) ControllerPublishVolume(ctx context.Context, req
 }
 
 func (server *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+	volumeID := req.GetVolumeId()
+	if volumeID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "[%s] empty volume id", ctx.Value(util.TraceIDKey))
+	}
+	// controllerUnpublishVolumeGroup implements idempotency with volumeID.
+	result, err, shared := retryOnAborted(ctx, "ControllerUnpublishVolume", req, &controllerUnpublishVolumeGroup, volumeID, server.controllerUnpublishVolume)
+	glog.V(4).Infof("[%s] Request of ControllerUnpublishVolume %s returns with shared=%v err=%v",
+		ctx.Value(util.TraceIDKey), volumeID, shared, err)
+	resp := result.(*csi.ControllerUnpublishVolumeResponse)
+	return resp, err
+}
+
+func (server *controllerServer) controllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 	// 1. Parse request args.
 	volumeID := req.GetVolumeId()
 	if volumeID == "" {

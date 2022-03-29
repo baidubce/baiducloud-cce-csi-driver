@@ -132,7 +132,7 @@ func (m *bosfsMounter) MountByBOSFS(ctx context.Context, source string, target s
 	glog.V(4).Infof("[%s] Bosfs container: %s starts", ctx.Value(util.TraceIDKey), container.ID)
 
 	// Wait for container to be ready.
-	subctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	subctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	if err := m.waitForBosfsContainerReady(subctx, container.ID, 500*time.Millisecond); err != nil {
 		glog.Errorf("[%s] Failed to wait for bosfs container: %s to be ready, err: %v", ctx.Value(util.TraceIDKey), container.ID, err)
